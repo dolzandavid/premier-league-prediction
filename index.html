@@ -111,6 +111,14 @@
       localStorage.setItem(`gw_${week}_fixtures`, JSON.stringify(fixtures));
     }
 
+    function getResults(week) {
+      return safeJSON(`gw_${week}_results`) || [];
+    }
+
+    function saveResults(week, results) {
+      localStorage.setItem(`gw_${week}_results`, JSON.stringify(results));
+    }
+
     function renderFixtures() {
       const fixtures = getFixtures(currentWeek);
       if (fixtures.length === 0) {
@@ -130,6 +138,22 @@
             if (confirm(`Delete fixture: ${f.home} vs ${f.away}?`)) {
               fixtures.splice(i, 1);
               saveFixtures(currentWeek, fixtures);
+
+              // Also remove predictions for this fixture from all players
+              players.forEach(p => {
+                let preds = safeJSON(`gw_${currentWeek}_predictions_${p}`) || [];
+                if (preds.length > i) {
+                  preds.splice(i,1);
+                  localStorage.setItem(`gw_${currentWeek}_predictions_${p}`, JSON.stringify(preds));
+                }
+              });
+              // Also remove results for this fixture
+              let results = getResults(currentWeek);
+              if (results.length > i) {
+                results.splice(i,1);
+                saveResults(currentWeek, results);
+              }
+
               renderFixtures();
               renderPredictions();
               renderResults();
@@ -156,15 +180,24 @@
         return;
       }
       const saved = safeJSON(`gw_${currentWeek}_predictions_${currentPlayer}`) || [];
+      const results = getResults(currentWeek);
+
       fixtures.forEach((f, i) => {
+        const res = results[i];
+        const hasResult = res && res.home !== "" && res.away !== "";
+
         const pred = saved[i] || { home: "", away: "" };
+
+        const disabled = hasResult; // disable inputs if result exists
+
         predictionsDiv.innerHTML += `
           <div class="flex gap-2 items-center mb-2">
             <label class="w-32">${f.home}</label>
-            <input id="ph_${i}" type="number" class="w-12 border p-1 rounded" value="${pred.home}" min="0" placeholder="-" />
+            <input id="ph_${i}" type="number" class="w-12 border p-1 rounded" value="${pred.home}" min="0" placeholder="-" ${disabled ? "disabled" : ""} />
             <span>:</span>
-            <input id="pa_${i}" type="number" class="w-12 border p-1 rounded" value="${pred.away}" min="0" placeholder="-" />
+            <input id="pa_${i}" type="number" class="w-12 border p-1 rounded" value="${pred.away}" min="0" placeholder="-" ${disabled ? "disabled" : ""} />
             <label class="w-32">${f.away}</label>
+            ${disabled ? `<span class="ml-2 text-red-600 text-xs italic">Result submitted, prediction locked</span>` : ""}
           </div>`;
       });
     }
@@ -176,7 +209,7 @@
         resultsDiv.textContent = "Add fixtures first.";
         return;
       }
-      const saved = safeJSON(`gw_${currentWeek}_results`) || [];
+      const saved = getResults(currentWeek);
       fixtures.forEach((f, i) => {
         const res = saved[i] || { home: "", away: "" };
         resultsDiv.innerHTML += `
@@ -186,8 +219,29 @@
             <span>:</span>
             <input id="ra_${i}" type="number" class="w-12 border p-1 rounded" value="${res.away}" min="0" placeholder="-" />
             <label class="w-32">${f.away}</label>
+            ${currentPlayer === "david" && (res.home !== "" || res.away !== "") ? `<button data-index="${i}" class="deleteResultBtn ml-4 bg-red-600 text-white text-xs rounded px-2 py-1">Delete Result</button>` : ""}
           </div>`;
       });
+
+      // Add event listeners for delete result buttons
+      setTimeout(() => {
+        document.querySelectorAll(".deleteResultBtn").forEach(btn => {
+          btn.onclick = (e) => {
+            const idx = parseInt(e.target.getAttribute("data-index"), 10);
+            if (confirm("Delete result for this fixture?")) {
+              const results = getResults(currentWeek);
+              if (results.length > idx) {
+                results.splice(idx, 1);
+                saveResults(currentWeek, results);
+                renderResults();
+                renderPredictions();
+                renderPointsPerFixture();
+                updateLeaderboard();
+              }
+            }
+          };
+        });
+      }, 50);
     }
 
     function renderAllPredictions() {
@@ -223,7 +277,7 @@
     function renderPointsPerFixture() {
       pointsPerFixtureDiv.innerHTML = "";
       const fixtures = getFixtures(currentWeek);
-      const results = safeJSON(`gw_${currentWeek}_results`) || [];
+      const results = getResults(currentWeek);
       if (fixtures.length === 0 || results.length === 0) {
         pointsPerFixtureDiv.textContent = "Add fixtures and results to see points per fixture.";
         return;
@@ -253,7 +307,7 @@
     function updateLeaderboard() {
       leaderboardDiv.innerHTML = "";
       const fixtures = getFixtures(currentWeek);
-      const results = safeJSON(`gw_${currentWeek}_results`) || [];
+      const results = getResults(currentWeek);
       if (fixtures.length === 0 || results.length === 0) {
         leaderboardDiv.textContent = "Add fixtures and results to see leaderboard.";
       } else {
@@ -280,7 +334,7 @@
       players.forEach(p => overallScores[p] = 0);
       for(let w=1; w<=38; w++) {
         const weekFixtures = getFixtures(w);
-        const weekResults = safeJSON(`gw_${w}_results`) || [];
+        const weekResults = getResults(w);
         if (weekFixtures.length === 0 || weekResults.length === 0) continue;
         players.forEach(p => {
           const weekPreds = safeJSON(`gw_${w}_predictions_${p}`) || [];
@@ -369,35 +423,47 @@
         alert("Please add fixtures first.");
         return;
       }
-      const saved = safeJSON(`gw_${currentWeek}_predictions_${currentPlayer}`) || [];
-      let changed = false;
-      const newPreds = fixtures.map((_, i) => {
+      const results = getResults(currentWeek);
+      const savedPreds = safeJSON(`gw_${currentWeek}_predictions_${currentPlayer}`) || [];
+
+      const newPreds = [];
+
+      for(let i=0; i < fixtures.length; i++) {
         const homeInput = document.getElementById(`ph_${i}`);
         const awayInput = document.getElementById(`pa_${i}`);
+        if (!homeInput || !awayInput) {
+          alert("Prediction inputs missing.");
+          return;
+        }
+
         const homeVal = homeInput.value.trim();
         const awayVal = awayInput.value.trim();
 
-        if (homeVal === "" && awayVal === "") {
-          // No prediction for this fixture, keep old if exists
-          return saved[i] || { home: "", away: "" };
-        } else if (homeVal === "" || awayVal === "") {
-          alert("Please enter both home and away scores or leave both blank for fixture #" + (i + 1));
-          throw new Error("Incomplete prediction");
-        } else {
-          const home = parseInt(homeVal, 10);
-          const away = parseInt(awayVal, 10);
-          if (isNaN(home) || isNaN(away)) {
-            alert("Please enter valid numbers for all predictions.");
-            throw new Error("Invalid prediction");
-          }
-          changed = true;
-          return { home, away };
-        }
-      });
+        const res = results[i];
+        const hasResult = res && res.home !== "" && res.away !== "";
 
-      if (!changed) {
-        alert("No changes to save.");
-        return;
+        if (hasResult) {
+          // Predictions locked for this fixture
+          newPreds.push(savedPreds[i] || { home: "", away: "" });
+          continue;
+        }
+
+        if (homeVal === "" && awayVal === "") {
+          // Allow skipping this fixture
+          newPreds.push(savedPreds[i] || { home: "", away: "" });
+          continue;
+        } else if (homeVal === "" || awayVal === "") {
+          alert(`Please enter both home and away scores or leave both blank for fixture #${i+1}.`);
+          return;
+        } else {
+          const homeNum = parseInt(homeVal, 10);
+          const awayNum = parseInt(awayVal, 10);
+          if (isNaN(homeNum) || isNaN(awayNum)) {
+            alert("Please enter valid numbers for all predictions.");
+            return;
+          }
+          newPreds.push({ home: homeNum, away: awayNum });
+        }
       }
 
       localStorage.setItem(`gw_${currentWeek}_predictions_${currentPlayer}`, JSON.stringify(newPreds));
@@ -409,12 +475,12 @@
     });
 
     submitResultsBtn.addEventListener("click", () => {
-      if (!currentWeek) {
-        alert("Please select a game week first.");
-        return;
-      }
       if (currentPlayer !== "david") {
         alert("Only David can submit results.");
+        return;
+      }
+      if (!currentWeek) {
+        alert("Please select a game week.");
         return;
       }
       const fixtures = getFixtures(currentWeek);
@@ -422,40 +488,49 @@
         alert("Please add fixtures first.");
         return;
       }
-      const saved = safeJSON(`gw_${currentWeek}_results`) || [];
+      const savedResults = getResults(currentWeek);
+      const newResults = [];
       let changed = false;
-      const newResults = fixtures.map((_, i) => {
+
+      for(let i=0; i < fixtures.length; i++) {
         const homeInput = document.getElementById(`rh_${i}`);
         const awayInput = document.getElementById(`ra_${i}`);
+        if (!homeInput || !awayInput) {
+          alert("Result inputs missing.");
+          return;
+        }
         const homeVal = homeInput.value.trim();
         const awayVal = awayInput.value.trim();
 
         if (homeVal === "" && awayVal === "") {
-          // No result for this fixture, keep old if exists
-          return saved[i] || { home: "", away: "" };
+          // keep old if exists
+          newResults.push(savedResults[i] || { home: "", away: "" });
         } else if (homeVal === "" || awayVal === "") {
-          alert("Please enter both home and away scores or leave both blank for fixture #" + (i + 1));
-          throw new Error("Incomplete result");
+          alert(`Please enter both home and away scores or leave both blank for fixture #${i+1}.`);
+          return;
         } else {
-          const home = parseInt(homeVal, 10);
-          const away = parseInt(awayVal, 10);
-          if (isNaN(home) || isNaN(away)) {
+          const homeNum = parseInt(homeVal, 10);
+          const awayNum = parseInt(awayVal, 10);
+          if (isNaN(homeNum) || isNaN(awayNum)) {
             alert("Please enter valid numbers for all results.");
-            throw new Error("Invalid result");
+            return;
           }
-          changed = true;
-          return { home, away };
+          newResults.push({ home: homeNum, away: awayNum });
+          if (!savedResults[i] || savedResults[i].home !== homeNum || savedResults[i].away !== awayNum) {
+            changed = true;
+          }
         }
-      });
+      }
 
       if (!changed) {
-        alert("No changes to save.");
+        alert("No changes detected to results.");
         return;
       }
 
-      localStorage.setItem(`gw_${currentWeek}_results`, JSON.stringify(newResults));
+      saveResults(currentWeek, newResults);
       alert("Results saved!");
       renderResults();
+      renderPredictions();
       renderPointsPerFixture();
       updateLeaderboard();
     });
