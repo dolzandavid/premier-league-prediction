@@ -26,6 +26,34 @@
     <button type="submit" class="bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Login</button>
   </form>
   <p id="loginMsg" class="text-red-600 mt-3 text-center"></p>
+
+  <button id="showResetBtn" class="mt-4 text-sm text-blue-700 underline hover:text-blue-900">Forgot or Reset Password?</button>
+
+  <form id="resetForm" class="flex flex-col gap-3 mt-4 hidden">
+    <h2 class="text-lg font-semibold text-center mb-2">Password Reset</h2>
+
+    <label for="resetPlayer" class="font-semibold">Select Player:</label>
+    <select id="resetPlayer" required class="p-2 border rounded">
+      <option value="" disabled selected>Choose player</option>
+      <option value="david">David</option>
+      <option value="katja">Katja</option>
+      <option value="mark">Mark</option>
+      <option value="jus">Jus</option>
+    </select>
+
+    <label for="currentPassword" class="font-semibold">Current Password:</label>
+    <input type="password" id="currentPassword" placeholder="Current password" class="p-2 border rounded" required />
+
+    <label for="newPassword" class="font-semibold">New Password:</label>
+    <input type="password" id="newPassword" placeholder="New password" class="p-2 border rounded" required />
+
+    <label for="confirmPassword" class="font-semibold">Confirm New Password:</label>
+    <input type="password" id="confirmPassword" placeholder="Confirm new password" class="p-2 border rounded" required />
+
+    <button type="submit" class="bg-green-600 text-white py-2 rounded hover:bg-green-700">Reset Password</button>
+    <button type="button" id="cancelResetBtn" class="mt-2 text-center text-red-600 underline hover:text-red-800">Cancel</button>
+    <p id="resetMsg" class="text-red-600 mt-2 text-center"></p>
+  </form>
 </div>
 
 <div id="gamePage" class="max-w-4xl mx-auto hidden">
@@ -107,6 +135,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const loginPlayer = document.getElementById("loginPlayer");
   const loginPassword = document.getElementById("loginPassword");
   const loginMsg = document.getElementById("loginMsg");
+  const showResetBtn = document.getElementById("showResetBtn");
+  const resetForm = document.getElementById("resetForm");
+  const resetPlayer = document.getElementById("resetPlayer");
+  const currentPassword = document.getElementById("currentPassword");
+  const newPassword = document.getElementById("newPassword");
+  const confirmPassword = document.getElementById("confirmPassword");
+  const resetMsg = document.getElementById("resetMsg");
+  const cancelResetBtn = document.getElementById("cancelResetBtn");
 
   // Game page elements
   const gamePage = document.getElementById("gamePage");
@@ -338,27 +374,36 @@ document.addEventListener("DOMContentLoaded", () => {
     const fixtures = getFixtures(currentWeek);
     const results = getResults(currentWeek);
     if(fixtures.length === 0 || results.length === 0) {
-      pointsPerFixtureContainer.textContent = "Points per fixture will appear here after results are entered.";
+      pointsPerFixtureContainer.textContent = "Points per fixture will show once results and predictions are entered.";
       return;
     }
 
-    const header = document.createElement("div");
-    header.className = "flex gap-4 font-bold border-b pb-1 mb-2";
-    header.innerHTML = `<div class="w-48">Fixture</div>${players.map(p => `<div class="w-20 text-center">${capitalize(p)}</div>`).join("")}`;
-    pointsPerFixtureContainer.appendChild(header);
+    const table = document.createElement("table");
+    table.className = "w-full border-collapse border";
 
-    fixtures.forEach((f,i) => {
-      const row = document.createElement("div");
-      row.className = "flex gap-4 mb-1 items-center";
-      const fixtureText = `${f.home} vs ${f.away}`;
-      row.innerHTML = `<div class="w-48">${fixtureText}</div>`;
+    const thead = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    headRow.innerHTML = "<th class='border p-1'>Fixture</th>";
+    players.forEach(p => {
+      headRow.innerHTML += `<th class='border p-1'>${capitalize(p)}</th>`;
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+
+    fixtures.forEach((f, i) => {
+      const actual = results[i];
+      if(!actual) return;
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td class='border p-1'>${f.home} vs ${f.away}</td>`;
 
       players.forEach(p => {
         const preds = getPredictions(currentWeek, p);
         const pred = preds[i];
-        const actual = results[i];
         let points = 0;
-        if(pred && actual) {
+        if(pred) {
           if(pred.home === actual.home) points++;
           if(pred.away === actual.away) points++;
           const predDiff = pred.home - pred.away;
@@ -366,25 +411,30 @@ document.addEventListener("DOMContentLoaded", () => {
           if ((predDiff === 0 && actualDiff === 0) || (predDiff * actualDiff > 0)) points += 2;
           if(pred.home === actual.home && pred.away === actual.away) points++;
         }
-        row.innerHTML += `<div class="w-20 text-center">${points}</div>`;
+        tr.innerHTML += `<td class='border p-1 text-center'>${points}</td>`;
       });
-      pointsPerFixtureContainer.appendChild(row);
+
+      tbody.appendChild(tr);
     });
+
+    table.appendChild(tbody);
+    pointsPerFixtureContainer.appendChild(table);
   }
 
   function updateLeaderboard() {
+    // Calculate weekly and total scores for all players
     const totalScores = {};
-    players.forEach(p => totalScores[p] = 0);
-
     const weeklyScores = {};
 
-    for(let gw=1; gw<=totalGameWeeks; gw++) {
-      const fixtures = getFixtures(gw);
-      const results = getResults(gw);
-      if(fixtures.length === 0 || results.length === 0) continue;
+    players.forEach(p => totalScores[p] = 0);
 
+    for(let gw=1; gw<=totalGameWeeks; gw++) {
       weeklyScores[gw] = {};
       players.forEach(p => weeklyScores[gw][p] = 0);
+
+      const fixtures = getFixtures(gw);
+      const results = getResults(gw);
+      if(results.length === 0) continue;
 
       fixtures.forEach((f, i) => {
         const actual = results[i];
@@ -457,6 +507,19 @@ document.addEventListener("DOMContentLoaded", () => {
     updateLeaderboard();
   }
 
+  // Find last active gameweek for player (predictions or results)
+  function findLastActiveGameWeek(player) {
+    for(let gw=totalGameWeeks; gw>=1; gw--) {
+      const preds = getPredictions(gw, player);
+      if(preds.length > 0) return gw;
+      const results = getResults(gw);
+      if(results.length > 0) return gw;
+      const fixtures = getFixtures(gw);
+      if(fixtures.length > 0 && player === "david") return gw;
+    }
+    return 1; // default to 1 if none
+  }
+
   // Event listeners for game page
   logoutBtn.addEventListener("click", () => {
     currentPlayer = null;
@@ -466,10 +529,12 @@ document.addEventListener("DOMContentLoaded", () => {
     loginMsg.textContent = "";
     gamePage.classList.add("hidden");
     loginPage.classList.remove("hidden");
+    resetForm.classList.add("hidden");
+    resetMsg.textContent = "";
   });
 
   gwSelect.addEventListener("change", () => {
-    currentWeek = gwSelect.value;
+    currentWeek = parseInt(gwSelect.value);
     renderAll();
   });
 
@@ -680,6 +745,7 @@ document.addEventListener("DOMContentLoaded", () => {
     reader.onload = evt => {
       try {
         const data = JSON.parse(evt.target.result);
+        // Clear existing gameweek and password keys
         for(let i=localStorage.length-1; i>=0; i--) {
           const key = localStorage.key(i);
           if(key.startsWith("gw_") || key.startsWith("pw_")) {
@@ -730,9 +796,63 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Password reset toggle
+  showResetBtn.addEventListener("click", () => {
+    resetForm.classList.toggle("hidden");
+    loginMsg.textContent = "";
+    resetMsg.textContent = "";
+  });
+
+  cancelResetBtn.addEventListener("click", () => {
+    resetForm.classList.add("hidden");
+    resetMsg.textContent = "";
+  });
+
+  resetForm.addEventListener("submit", e => {
+    e.preventDefault();
+    const player = resetPlayer.value;
+    const curPw = currentPassword.value.trim();
+    const newPwVal = newPassword.value.trim();
+    const confirmPw = confirmPassword.value.trim();
+
+    if(!players.includes(player)) {
+      resetMsg.textContent = "Invalid player selected.";
+      return;
+    }
+    if(!curPw || !newPwVal || !confirmPw) {
+      resetMsg.textContent = "Please fill all fields.";
+      return;
+    }
+    if(newPwVal !== confirmPw) {
+      resetMsg.textContent = "New passwords do not match.";
+      return;
+    }
+
+    const storedPw = getPassword(player);
+    if(storedPw === null) {
+      resetMsg.textContent = "Player has no password set yet.";
+      return;
+    }
+
+    if(storedPw !== curPw) {
+      resetMsg.textContent = "Current password is incorrect.";
+      return;
+    }
+
+    savePassword(player, newPwVal);
+    resetMsg.style.color = "green";
+    resetMsg.textContent = "Password reset successful! You can now login.";
+    // Clear fields
+    currentPassword.value = "";
+    newPassword.value = "";
+    confirmPassword.value = "";
+  });
+
+  // Successful login
   function loginSuccess(player) {
     currentPlayer = player;
-    currentWeek = 1;
+    // Determine last active gameweek for player
+    currentWeek = findLastActiveGameWeek(player);
     gwSelect.value = currentWeek;
     loginPage.classList.add("hidden");
     gamePage.classList.remove("hidden");
@@ -741,5 +861,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 </script>
+
 </body>
 </html>
