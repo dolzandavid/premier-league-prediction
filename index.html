@@ -35,4 +35,272 @@
       <div class="flex gap-2 mb-2">
         <input id="homeTeam" placeholder="Home Team" class="flex-1 border p-2 rounded" />
         <input id="awayTeam" placeholder="Away Team" class="flex-1 border p-2 rounded" />
-        <button id="addFixture" class="bg-blue-500 text-wh
+        <button id="addFixture" class="bg-blue-500 text-white px-4 py-2 rounded">Add</button>
+      </div>
+      <div id="fixturesDiv" class="text-sm text-gray-600"></div>
+    </div>
+
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold mb-2">Your Predictions</h2>
+      <div id="predictionsDiv"></div>
+      <button id="submitPredictions" class="mt-2 bg-green-600 text-white px-4 py-2 rounded">Submit Predictions</button>
+    </div>
+
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold mb-2">Actual Results</h2>
+      <div id="resultsDiv"></div>
+      <button id="submitResults" class="mt-2 bg-purple-600 text-white px-4 py-2 rounded">Submit Results</button>
+    </div>
+
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold mb-2">All Predictions</h2>
+      <div id="allPredictionsDiv"></div>
+    </div>
+
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold mb-2">Leaderboard</h2>
+      <div id="leaderboardDiv"></div>
+    </div>
+  </div>
+
+  <script>
+    // Manual populate week options (since template literals don't work in static HTML)
+    const weekSelect = document.getElementById("week");
+    if (weekSelect.options.length === 1) { // only placeholder exists
+      for (let i = 1; i <= 38; i++) {
+        const opt = document.createElement("option");
+        opt.value = i;
+        opt.textContent = `Week ${i}`;
+        weekSelect.appendChild(opt);
+      }
+    }
+
+    const players = ["david", "katja", "mark", "jus"];
+    const playerEl = document.getElementById("player");
+    const weekEl = document.getElementById("week");
+    const fixturesDiv = document.getElementById("fixturesDiv");
+    const predictionsDiv = document.getElementById("predictionsDiv");
+    const resultsDiv = document.getElementById("resultsDiv");
+    const allPredictionsDiv = document.getElementById("allPredictionsDiv");
+    const leaderboardDiv = document.getElementById("leaderboardDiv");
+
+    let currentPlayer = "";
+    let currentWeek = "";
+
+    function safeJSON(key) {
+      try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
+    }
+
+    function getFixtures(week) {
+      return safeJSON(`gw_${week}_fixtures`) || [];
+    }
+
+    function saveFixtures(week, fixtures) {
+      localStorage.setItem(`gw_${week}_fixtures`, JSON.stringify(fixtures));
+    }
+
+    function renderFixtures() {
+      const fixtures = getFixtures(currentWeek);
+      if (fixtures.length === 0) {
+        fixturesDiv.textContent = "No fixtures added for this week.";
+      } else {
+        fixturesDiv.innerHTML = fixtures.map(f => `<div>${f.home} vs ${f.away}</div>`).join("");
+      }
+    }
+
+    function renderPredictions() {
+      predictionsDiv.innerHTML = "";
+      const fixtures = getFixtures(currentWeek);
+      if (!currentPlayer || !currentWeek) {
+        predictionsDiv.textContent = "Select player and week to enter predictions.";
+        return;
+      }
+      if (fixtures.length === 0) {
+        predictionsDiv.textContent = "Add fixtures first.";
+        return;
+      }
+      const saved = safeJSON(`gw_${currentWeek}_predictions_${currentPlayer}`) || [];
+      fixtures.forEach((f, i) => {
+        const pred = saved[i] || { home: "", away: "" };
+        predictionsDiv.innerHTML += `
+          <div class="flex gap-2 items-center mb-2">
+            <label class="w-32">${f.home}</label>
+            <input id="ph_${i}" type="number" class="w-12 border p-1 rounded" value="${pred.home}" min="0"/>
+            <span>:</span>
+            <input id="pa_${i}" type="number" class="w-12 border p-1 rounded" value="${pred.away}" min="0"/>
+            <label class="w-32">${f.away}</label>
+          </div>`;
+      });
+    }
+
+    function renderResults() {
+      resultsDiv.innerHTML = "";
+      const fixtures = getFixtures(currentWeek);
+      if (fixtures.length === 0) {
+        resultsDiv.textContent = "Add fixtures first.";
+        return;
+      }
+      const saved = safeJSON(`gw_${currentWeek}_results`) || [];
+      fixtures.forEach((f, i) => {
+        const res = saved[i] || { home: "", away: "" };
+        resultsDiv.innerHTML += `
+          <div class="flex gap-2 items-center mb-2">
+            <label class="w-32">${f.home}</label>
+            <input id="rh_${i}" type="number" class="w-12 border p-1 rounded" value="${res.home}" min="0"/>
+            <span>:</span>
+            <input id="ra_${i}" type="number" class="w-12 border p-1 rounded" value="${res.away}" min="0"/>
+            <label class="w-32">${f.away}</label>
+          </div>`;
+      });
+    }
+
+    function renderAllPredictions() {
+      allPredictionsDiv.innerHTML = "";
+      const fixtures = getFixtures(currentWeek);
+      if (fixtures.length === 0) {
+        allPredictionsDiv.textContent = "No fixtures added.";
+        return;
+      }
+      players.forEach(p => {
+        const saved = safeJSON(`gw_${currentWeek}_predictions_${p}`) || [];
+        if (!saved.length) return;
+        let html = `<h3 class="capitalize font-semibold mt-4">${p}</h3>`;
+        saved.forEach((s, i) => {
+          html += `<div>${fixtures[i].home} ${s.home}:${s.away} ${fixtures[i].away}</div>`;
+        });
+        allPredictionsDiv.innerHTML += html;
+      });
+    }
+
+    function updateLeaderboard() {
+      leaderboardDiv.innerHTML = "";
+      const fixtures = getFixtures(currentWeek);
+      const results = safeJSON(`gw_${currentWeek}_results`) || [];
+      if (fixtures.length === 0 || results.length === 0) {
+        leaderboardDiv.textContent = "Add fixtures and results to see leaderboard.";
+        return;
+      }
+      const scores = {};
+      players.forEach(p => { scores[p] = 0; });
+      players.forEach(p => {
+        const saved = safeJSON(`gw_${currentWeek}_predictions_${p}`) || [];
+        saved.forEach((s, i) => {
+          const r = results[i];
+          if (!r) return;
+          let score = 0;
+          if (s.home == r.home) score++;
+          if (s.away == r.away) score++;
+          const predDiff = s.home - s.away;
+          const resDiff = r.home - r.away;
+          if ((predDiff === 0 && resDiff === 0) || (predDiff * resDiff > 0)) score += 2;
+          if (s.home == r.home && s.away == r.away) score++;
+          scores[p] += score;
+        });
+      });
+      for (const p of players) {
+        leaderboardDiv.innerHTML += `<div class="capitalize font-semibold">${p}: ${scores[p]} pts</div>`;
+      }
+    }
+
+    function handleChange() {
+      currentPlayer = playerEl.value;
+      currentWeek = weekEl.value;
+      if (!currentPlayer || !currentWeek) {
+        fixturesDiv.textContent = "Select player and week.";
+        predictionsDiv.textContent = "";
+        resultsDiv.textContent = "";
+        allPredictionsDiv.textContent = "";
+        leaderboardDiv.textContent = "";
+        return;
+      }
+      renderFixtures();
+      renderPredictions();
+      renderResults();
+      renderAllPredictions();
+      updateLeaderboard();
+    }
+
+    playerEl.addEventListener("change", handleChange);
+    weekEl.addEventListener("change", handleChange);
+
+    document.getElementById("addFixture").addEventListener("click", () => {
+      if (!currentWeek) {
+        alert("Please select a game week first.");
+        return;
+      }
+      const home = document.getElementById("homeTeam").value.trim();
+      const away = document.getElementById("awayTeam").value.trim();
+      if (!home || !away) {
+        alert("Please enter both Home and Away team names.");
+        return;
+      }
+      const fixtures = getFixtures(currentWeek);
+      fixtures.push({ home, away });
+      saveFixtures(currentWeek, fixtures);
+      document.getElementById("homeTeam").value = "";
+      document.getElementById("awayTeam").value = "";
+      renderFixtures();
+      renderPredictions();
+      renderResults();
+      renderAllPredictions();
+    });
+
+    document.getElementById("submitPredictions").addEventListener("click", () => {
+      if (!currentPlayer || !currentWeek) {
+        alert("Please select a player and game week first.");
+        return;
+      }
+      const fixtures = getFixtures(currentWeek);
+      if (fixtures.length === 0) {
+        alert("Please add fixtures first.");
+        return;
+      }
+      const preds = fixtures.map((_, i) => {
+        const home = document.getElementById(`ph_${i}`).value;
+        const away = document.getElementById(`pa_${i}`).value;
+        if (home === "" || away === "") {
+          alert("Please enter all predictions.");
+          throw new Error("Incomplete predictions");
+        }
+        return { home: parseInt(home, 10), away: parseInt(away, 10) };
+      });
+      localStorage.setItem(`gw_${currentWeek}_predictions_${currentPlayer}`, JSON.stringify(preds));
+      alert("Predictions saved!");
+      renderPredictions();
+      renderAllPredictions();
+      updateLeaderboard();
+    });
+
+    document.getElementById("submitResults").addEventListener("click", () => {
+      if (!currentWeek) {
+        alert("Please select a game week first.");
+        return;
+      }
+      const fixtures = getFixtures(currentWeek);
+      if (fixtures.length === 0) {
+        alert("Please add fixtures first.");
+        return;
+      }
+      const res = fixtures.map((_, i) => {
+        const home = document.getElementById(`rh_${i}`).value;
+        const away = document.getElementById(`ra_${i}`).value;
+        if (home === "" || away === "") {
+          alert("Please enter all results.");
+          throw new Error("Incomplete results");
+        }
+        return { home: parseInt(home, 10), away: parseInt(away, 10) };
+      });
+      localStorage.setItem(`gw_${currentWeek}_results`, JSON.stringify(res));
+      alert("Results saved!");
+      updateLeaderboard();
+    });
+
+    // Initialize empty page text
+    fixturesDiv.textContent = "Select player and week.";
+    predictionsDiv.textContent = "";
+    resultsDiv.textContent = "";
+    allPredictionsDiv.textContent = "";
+    leaderboardDiv.textContent = "";
+  </script>
+</body>
+</html>
