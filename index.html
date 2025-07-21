@@ -80,6 +80,11 @@
     const overallLeaderboardDiv = document.getElementById("overallLeaderboardDiv");
     const pointsPerFixtureDiv = document.getElementById("pointsPerFixtureDiv");
     const fixtureControls = document.getElementById("fixtureControls");
+    const addFixtureBtn = document.getElementById("addFixture");
+    const homeInput = document.getElementById("homeTeam");
+    const awayInput = document.getElementById("awayTeam");
+    const submitPredictionsBtn = document.getElementById("submitPredictions");
+    const submitResultsBtn = document.getElementById("submitResults");
 
     let currentPlayer = "";
     let currentWeek = "";
@@ -205,7 +210,6 @@
       });
     }
 
-    // Calculate points for one prediction vs actual result for a fixture
     function calculatePoints(pred, actual) {
       let points = 0;
       if (pred.home === actual.home) points++;
@@ -225,7 +229,6 @@
         pointsPerFixtureDiv.textContent = "Add fixtures and results to see points per fixture.";
         return;
       }
-      // Header row with fixture names
       let html = "<table class='w-full border border-collapse text-sm'><thead><tr><th class='border px-2 py-1'>Player</th>";
       fixtures.forEach((f, i) => {
         html += `<th class="border px-2 py-1">${f.home} vs ${f.away}</th>`;
@@ -254,27 +257,26 @@
       const results = safeJSON(`gw_${currentWeek}_results`) || [];
       if (fixtures.length === 0 || results.length === 0) {
         leaderboardDiv.textContent = "Add fixtures and results to see leaderboard.";
-        return;
-      }
-      const scores = {};
-      players.forEach(p => { scores[p] = 0; });
-      players.forEach(p => {
-        const saved = safeJSON(`gw_${currentWeek}_predictions_${p}`) || [];
-        saved.forEach((s, i) => {
-          const r = results[i];
-          if (!r) return;
-          scores[p] += calculatePoints(s, r);
+      } else {
+        const scores = {};
+        players.forEach(p => { scores[p] = 0; });
+        players.forEach(p => {
+          const saved = safeJSON(`gw_${currentWeek}_predictions_${p}`) || [];
+          saved.forEach((s, i) => {
+            const r = results[i];
+            if (!r) return;
+            scores[p] += calculatePoints(s, r);
+          });
         });
-      });
-      // Sort descending
-      const sorted = Object.entries(scores).sort((a,b) => b[1] - a[1]);
-      let html = "<h3 class='font-semibold mb-2'>Leaderboard for Week " + currentWeek + "</h3>";
-      sorted.forEach(([p, s]) => {
-        html += `<div class="capitalize font-semibold">${p}: ${s} pts</div>`;
-      });
-      leaderboardDiv.innerHTML = html;
+        const sorted = Object.entries(scores).sort((a,b) => b[1] - a[1]);
+        let html = `<h3 class='font-semibold mb-2'>Leaderboard for Week ${currentWeek}</h3>`;
+        sorted.forEach(([p, s]) => {
+          html += `<div class="capitalize font-semibold">${p}: ${s} pts</div>`;
+        });
+        leaderboardDiv.innerHTML = html;
+      }
 
-      // Overall leaderboard over all weeks
+      // Overall leaderboard
       const overallScores = {};
       players.forEach(p => overallScores[p] = 0);
       for(let w=1; w<=38; w++) {
@@ -299,11 +301,12 @@
     }
 
     function updateFixtureControlsVisibility() {
-      // Only David can add/delete fixtures => show/hide fixtureControls and delete buttons dynamically handled in renderFixtures()
       if (currentPlayer === "david") {
         fixtureControls.style.display = "flex";
+        submitResultsBtn.disabled = false;
       } else {
         fixtureControls.style.display = "none";
+        submitResultsBtn.disabled = true;
       }
     }
 
@@ -311,6 +314,7 @@
       currentPlayer = playerEl.value;
       currentWeek = weekEl.value;
       updateFixtureControlsVisibility();
+
       if (!currentPlayer || !currentWeek) {
         fixturesDiv.textContent = "Select player and week.";
         predictionsDiv.textContent = "";
@@ -332,7 +336,7 @@
     playerEl.addEventListener("change", handleChange);
     weekEl.addEventListener("change", handleChange);
 
-    document.getElementById("addFixture").addEventListener("click", () => {
+    addFixtureBtn.addEventListener("click", () => {
       if (!currentWeek) {
         alert("Please select a game week first.");
         return;
@@ -341,8 +345,8 @@
         alert("Only David can add fixtures.");
         return;
       }
-      const home = document.getElementById("homeTeam").value.trim();
-      const away = document.getElementById("awayTeam").value.trim();
+      const home = homeInput.value.trim();
+      const away = awayInput.value.trim();
       if (!home || !away) {
         alert("Please enter both Home and Away team names.");
         return;
@@ -350,8 +354,8 @@
       const fixtures = getFixtures(currentWeek);
       fixtures.push({ home, away });
       saveFixtures(currentWeek, fixtures);
-      document.getElementById("homeTeam").value = "";
-      document.getElementById("awayTeam").value = "";
+      homeInput.value = "";
+      awayInput.value = "";
       renderFixtures();
       renderPredictions();
       renderResults();
@@ -360,7 +364,7 @@
       updateLeaderboard();
     });
 
-    document.getElementById("submitPredictions").addEventListener("click", () => {
+    submitPredictionsBtn.addEventListener("click", () => {
       if (!currentPlayer || !currentWeek) {
         alert("Please select a player and game week first.");
         return;
@@ -370,24 +374,25 @@
         alert("Please add fixtures first.");
         return;
       }
-      const preds = fixtures.map((_, i) => {
-        const home = document.getElementById(`ph_${i}`).value;
-        const away = document.getElementById(`pa_${i}`).value;
-        if (home === "" || away === "") {
-          alert("Please enter all predictions.");
-          throw new Error("Incomplete predictions");
-        }
-        return { home: parseInt(home, 10), away: parseInt(away, 10) };
-      });
-      localStorage.setItem(`gw_${currentWeek}_predictions_${currentPlayer}`, JSON.stringify(preds));
-      alert("Predictions saved!");
-      renderPredictions();
-      renderAllPredictions();
-      renderPointsPerFixture();
-      updateLeaderboard();
+      try {
+        const preds = fixtures.map((_, i) => {
+          const home = document.getElementById(`ph_${i}`).value;
+          const away = document.getElementById(`pa_${i}`).value;
+          if (home === "" || away === "") throw new Error("Incomplete predictions");
+          return { home: parseInt(home, 10), away: parseInt(away, 10) };
+        });
+        localStorage.setItem(`gw_${currentWeek}_predictions_${currentPlayer}`, JSON.stringify(preds));
+        alert("Predictions saved!");
+        renderPredictions();
+        renderAllPredictions();
+        renderPointsPerFixture();
+        updateLeaderboard();
+      } catch {
+        alert("Please enter all predictions.");
+      }
     });
 
-    document.getElementById("submitResults").addEventListener("click", () => {
+    submitResultsBtn.addEventListener("click", () => {
       if (!currentWeek) {
         alert("Please select a game week first.");
         return;
@@ -401,27 +406,32 @@
         alert("Please add fixtures first.");
         return;
       }
-      const res = fixtures.map((_, i) => {
-        const home = document.getElementById(`rh_${i}`).value;
-        const away = document.getElementById(`ra_${i}`).value;
-        if (home === "" || away === "") {
-          alert("Please enter all results.");
-          throw new Error("Incomplete results");
-        }
-        return { home: parseInt(home, 10), away: parseInt(away, 10) };
-      });
-      localStorage.setItem(`gw_${currentWeek}_results`, JSON.stringify(res));
-      alert("Results saved!");
-      renderResults();
-      renderPointsPerFixture();
-      updateLeaderboard();
+      try {
+        const res = fixtures.map((_, i) => {
+          const home = document.getElementById(`rh_${i}`).value;
+          const away = document.getElementById(`ra_${i}`).value;
+          if (home === "" || away === "") throw new Error("Incomplete results");
+          return { home: parseInt(home, 10), away: parseInt(away, 10) };
+        });
+        localStorage.setItem(`gw_${currentWeek}_results`, JSON.stringify(res));
+        alert("Results saved!");
+        renderResults();
+        renderPointsPerFixture();
+        updateLeaderboard();
+      } catch {
+        alert("Please enter all results.");
+      }
     });
 
-    // Initialize placeholders before any selection
+    // Initial state
     fixturesDiv.textContent = "Select player and week.";
     predictionsDiv.textContent = "";
     resultsDiv.textContent = "";
     allPredictionsDiv.textContent = "";
     pointsPerFixtureDiv.textContent = "";
     leaderboardDiv.textContent = "";
-    overallLeaderboard
+    overallLeaderboardDiv.textContent = "";
+
+  </script>
+</body>
+</html>
