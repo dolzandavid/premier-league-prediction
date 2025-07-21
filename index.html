@@ -96,7 +96,7 @@
           <input placeholder="Away" class="p-1 border rounded w-32" />
         `;
         fixturesContainer.appendChild(div);
-        saveAndReload();
+        // Do NOT saveAndReload() here to avoid wiping existing fixtures
       });
 
       fixturesContainer.addEventListener("input", () => {
@@ -309,6 +309,8 @@
         const gw = gwSelect.value;
         if (!currentPlayer || !gw) {
           predictionsContainer.textContent = "Please select player and game week.";
+          resultsContainer.textContent = "";
+          fixturesContainer.textContent = "";
           return;
         }
         loadFixtures(gw);
