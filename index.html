@@ -38,8 +38,8 @@
     <button id="saveDeadlineBtn" class="ml-2 bg-blue-600 text-white px-3 py-1 rounded hidden">Save Deadline</button>
   </div>
 
-  <!-- Fixtures Input -->
-  <div class="mb-6">
+  <!-- Fixtures Input (David only) -->
+  <div class="mb-6" id="fixturesSection">
     <h2 class="text-xl font-semibold mb-2">Fixtures</h2>
     <button id="addFixture" class="mb-2 bg-blue-500 text-white px-2 py-1 rounded hidden">Add Fixture</button>
     <div id="fixtures"></div>
@@ -95,6 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const playerSelect = document.getElementById("playerSelect");
   const gwSelect = document.getElementById("gameWeek");
   const fixturesContainer = document.getElementById("fixtures");
+  const fixturesSection = document.getElementById("fixturesSection");
   const predictionsContainer = document.getElementById("predictions");
   const resultsContainer = document.getElementById("results");
   const submitPredictionsBtn = document.getElementById("submitPredictions");
@@ -160,12 +161,14 @@ document.addEventListener("DOMContentLoaded", () => {
       deadlineInput.classList.remove("hidden");
       saveDeadlineBtn.classList.remove("hidden");
       dataBackupDiv.classList.remove("hidden");
+      fixturesSection.classList.remove("hidden");
     } else {
       addFixtureBtn.classList.add("hidden");
       submitResultsBtn.classList.add("hidden");
       deadlineInput.classList.add("hidden");
       saveDeadlineBtn.classList.add("hidden");
       dataBackupDiv.classList.add("hidden");
+      fixturesSection.classList.add("hidden"); // Hide fixtures section for non-David
     }
   }
 
@@ -178,6 +181,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Render fixtures with delete button (David only)
   function renderFixtures() {
+    if(currentPlayer !== "david") return; // Only David sees this section
     const fixtures = getFixtures(currentWeek);
     fixturesContainer.innerHTML = "";
     fixtures.forEach((f,i) => {
@@ -185,16 +189,17 @@ document.addEventListener("DOMContentLoaded", () => {
       div.className = "flex gap-2 mb-2 items-center";
 
       div.innerHTML = `
-        <input type="text" class="p-1 border rounded w-32" value="${f.home}" data-index="${i}" data-type="home" ${currentPlayer === "david" ? "" : "readonly"} />
+        <input type="text" class="p-1 border rounded w-32" value="${f.home}" data-index="${i}" data-type="home" />
         <span>vs</span>
-        <input type="text" class="p-1 border rounded w-32" value="${f.away}" data-index="${i}" data-type="away" ${currentPlayer === "david" ? "" : "readonly"} />
-        ${currentPlayer === "david" ? `<button class="delete-fixture-btn bg-red-700 text-white px-2 py-1 rounded ml-2" data-index="${i}" title="Delete fixture">Delete</button>` : ""}
+        <input type="text" class="p-1 border rounded w-32" value="${f.away}" data-index="${i}" data-type="away" />
+        <button class="delete-fixture-btn bg-red-700 text-white px-2 py-1 rounded ml-2" data-index="${i}" title="Delete fixture">Delete</button>
       `;
       fixturesContainer.appendChild(div);
     });
   }
 
   // Render predictions with input boxes or labels and delete buttons for each fixture
+  // Includes fixture names inline for all players
   function renderPredictions() {
     const fixtures = getFixtures(currentWeek);
     const results = getResults(currentWeek);
@@ -210,7 +215,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const playerPreds = getPredictions(currentWeek, currentPlayer);
-    // Render each fixture's prediction input or label
     fixtures.forEach((f, i) => {
       const resultEntered = results[i] !== undefined;
       const pred = playerPreds[i] || { home: "", away: "" };
@@ -401,13 +405,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if(!currentWeek) return;
     const fixtures = getFixtures(currentWeek);
     if(idx >= fixtures.length) return;
-    if(!confirm(`Delete fixture ${idx+1}? This will remove related predictions and results.`)) return;
+    if(!confirm("Delete this fixture? This will also delete associated predictions and results.")) return;
 
-    // Remove fixture
     fixtures.splice(idx, 1);
     saveFixtures(currentWeek, fixtures);
 
-    // Also remove related predictions and results for this fixture index
+    // Remove associated predictions and results for that fixture index
     players.forEach(p => {
       let preds = getPredictions(currentWeek, p);
       if(preds.length > idx) {
@@ -421,7 +424,11 @@ document.addEventListener("DOMContentLoaded", () => {
       saveResults(currentWeek, results);
     }
 
-    renderAll();
+    renderFixtures();
+    renderPredictions();
+    renderResults();
+    renderPointsPerFixture();
+    updateLeaderboard();
   });
 
   // Update fixture inputs (David only)
@@ -439,7 +446,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderPredictions();
   });
 
-  // Submit predictions
+  // Submit predictions (partial allowed)
   submitPredictionsBtn.addEventListener("click", () => {
     if(!currentPlayer) return alert("Select a player.");
     if(!currentWeek) return alert("Select a game week.");
@@ -448,19 +455,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let predictions = getPredictions(currentWeek, currentPlayer);
 
-    // Validate and update only entered predictions (partial allowed)
+    // Validate and update only entered predictions for fixtures without results
     for(let i=0; i<fixtures.length; i++) {
       const resultExists = getResults(currentWeek)[i] !== undefined;
-      if(resultExists) continue; // No submission allowed if result present
+      if(resultExists) continue;
 
       const homeInput = document.getElementById(`pred_home_${i}`);
       const awayInput = document.getElementById(`pred_away_${i}`);
-      if(!homeInput || !awayInput) continue; // skip
+      if(!homeInput || !awayInput) continue;
 
       const homeVal = homeInput.value;
       const awayVal = awayInput.value;
 
-      if(homeVal === "" && awayVal === "") continue; // no input for this fixture
+      if(homeVal === "" && awayVal === "") continue;
 
       const homeNum = parseInt(homeVal);
       const awayNum = parseInt(awayVal);
@@ -481,7 +488,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderPointsPerFixture();
   });
 
-  // Delete prediction button
+  // Delete prediction button (only if result not submitted)
   predictionsContainer.addEventListener("click", e => {
     if(!e.target.classList.contains("delete-pred-btn")) return;
     if(!currentPlayer) return;
@@ -517,7 +524,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const homeVal = homeInput.value;
       const awayVal = awayInput.value;
 
-      if(homeVal === "" && awayVal === "") continue; // skip empty
+      if(homeVal === "" && awayVal === "") continue;
 
       const homeNum = parseInt(homeVal);
       const awayNum = parseInt(awayVal);
@@ -565,7 +572,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // Export data (David only)
   exportDataBtn.addEventListener("click", () => {
     if(currentPlayer !== "david") return alert("Only David can export data.");
-    // Collect keys and values related to this game
     const data = {};
     for(let i=0; i<localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -615,20 +621,7 @@ document.addEventListener("DOMContentLoaded", () => {
     reader.readAsText(file);
   });
 
-  // On input change for fixtures, save changes automatically (David only)
-  fixturesContainer.addEventListener("input", (e) => {
-    if(currentPlayer !== "david") return;
-    if(!e.target.dataset.index) return;
-    const idx = +e.target.dataset.index;
-    const type = e.target.dataset.type;
-    const fixtures = getFixtures(currentWeek);
-    if(idx >= fixtures.length) return;
-    fixtures[idx][type] = e.target.value.trim();
-    saveFixtures(currentWeek, fixtures);
-    renderPredictions();
-  });
-
-  // Render everything
+  // Render all UI parts
   function renderAll() {
     if(!currentWeek || !currentPlayer) {
       predictionsContainer.textContent = "Please select a player and a game week.";
@@ -650,14 +643,11 @@ document.addEventListener("DOMContentLoaded", () => {
     updateLeaderboard();
   }
 
-  // Initial values
+  // Initialize
   currentPlayer = playerSelect.value;
   currentWeek = gwSelect.value;
-
-  // Initialize UI
   updateControlsVisibility();
   renderAll();
-
 });
 </script>
 </body>
