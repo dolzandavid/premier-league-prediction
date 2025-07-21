@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Premier League Prediction Game</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-4 text-gray-900">
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-2xl font-bold mb-4">Premier League Prediction Game</h1>
+
+    <!-- Login -->
+    <div class="mb-4">
+      <label for="playerSelect" class="font-semibold">Login as:</label>
+      <select id="playerSelect" class="ml-2 p-1 border rounded">
+        <option value="">Select player</option>
+        <option value="david">David</option>
+        <option value="katja">Katja</option>
+        <option value="mark">Mark</option>
+        <option value="jus">Jus</option>
+      </select>
+    </div>
+
+    <!-- Gameweek Navigation -->
+    <div class="mb-4">
+      <label for="gameWeek" class="font-semibold">Game Week:</label>
+      <select id="gameWeek" class="ml-2 p-1 border rounded">
+        <!-- JS will populate this -->
+      </select>
+    </div>
+
+    <!-- Fixtures Input -->
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold mb-2">Fixtures</h2>
+      <button id="addFixture" class="mb-2 bg-blue-500 text-white px-2 py-1 rounded">Add Fixture</button>
+      <div id="fixtures"></div>
+    </div>
+
+    <!-- Predictions Section -->
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold mb-2">Your Predictions</h2>
+      <div id="predictions"></div>
+      <button id="submitPredictions" class="mt-2 bg-green-500 text-white px-4 py-2 rounded">Submit Predictions</button>
+    </div>
+
+    <!-- Results Input -->
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold mb-2">Actual Results</h2>
+      <div id="results"></div>
+      <button id="submitResults" class="mt-2 bg-purple-500 text-white px-4 py-2 rounded">Submit Results</button>
+    </div>
+
+    <!-- Leaderboard -->
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold mb-2">Leaderboard</h2>
+      <div id="leaderboard" class="bg-white p-4 rounded shadow"></div>
+    </div>
+  </div>
+
+  <script>
+    const players = ["david", "katja", "mark", "jus"];
+    const totalGameWeeks = 38;
+    let currentPlayer = null;
+
+    document.getElementById("playerSelect").addEventListener("change", e => {
+      currentPlayer = e.target.value;
+      loadAll();
+    });
+
+    // Populate gameweek selector
+    const gwSelect = document.getElementById("gameWeek");
+    for (let i = 1; i <= totalGameWeeks; i++) {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = `Week ${i}`;
+      gwSelect.appendChild(opt);
+    }
+    gwSelect.addEventListener("change", loadAll);
+
+    // Load data for game week and user
+    function loadAll() {
+      const gw = gwSelect.value;
+      if (!currentPlayer || !gw) return;
+      loadFixtures(gw);
+      loadPredictions(gw);
+      loadResults(gw);
+      updateLeaderboard();
+    }
+
+    // Fixture input
+    document.getElementById("addFixture").addEventListener("click", () => {
+      const div = document.createElement("div");
+      div.className = "flex gap-2 mb-2";
+      div.innerHTML = `
+        <input placeholder="Home" class="p-1 border rounded w-32" />
+        <span>vs</span>
+        <input placeholder="Away" class="p-1 border rounded w-32" />
+      `;
+      document.getElementById("fixtures").appendChild(div);
+    });
+
+    function saveFixtures(gw) {
+      const fixtureEls = document.querySelectorAll("#fixtures > div");
+      const fixtures = Array.from(fixtureEls).map(el => {
+        const inputs = el.querySelectorAll("input");
+        return { home: inputs[0].value, away: inputs[1].value };
+      });
+      localStorage.setItem(`gw_${gw}_fixtures`, JSON.stringify(fixtures));
+    }
+
+    function loadFixtures(gw) {
+      const fixtures = JSON.parse(localStorage.getItem(`gw_${gw}_fixtures`) || "[]");
+      const container = document.getElementById("fixtures");
+      container.innerHTML = "";
+      fixtures.forEach(f => {
+        const div = document.createElement("div");
+        div.className = "flex gap-2 mb-2";
+        div.innerHTML = `
+          <input value="${f.home}" class="p-1 border rounded w-32" />
+          <span>vs</span>
+          <input value="${f.away}" class="p-1 border rounded w-32" />
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    // Predictions
+    document.getElementById("submitPredictions").addEventListener("click", () => {
+      const gw = gwSelect.value;
+      const fixtureData = getFixtureData(gw);
+      const predictions = [];
+      fixtureData.forEach((f, i) => {
+        const home = parseInt(document.getElementById(`pred_home_${i}`).value);
+        const away = parseInt(document.getElementById(`pred_away_${i}`).value);
+        predictions.push({ home, away });
+      });
+      localStorage.setItem(`gw_${gw}_predictions_${currentPlayer}`, JSON.stringify(predictions));
+      loadPredictions(gw);
+    });
+
+    function getFixtureData(gw) {
+      return JSON.parse(localStorage.getItem(`gw_${gw}_fixtures`) || "[]");
+    }
+
+    function loadPredictions(gw) {
+      const fixtureData = getFixtureData(gw);
+      const container = document.getElementById("predictions");
+      container.innerHTML = "";
+      const existing = JSON.parse(localStorage.getItem(`gw_${gw}_predictions_${currentPlayer}`) || "null");
+
+      fixtureData.forEach((f, i) => {
+        const row = document.createElement("div");
+        row.className = "flex gap-2 items-center mb-2";
+
+        const inputFields = existing ?
+          `<span>${f.home} ${existing[i]?.home ?? "-"} : ${existing[i]?.away ?? "-"} ${f.away}</span>` :
+          `
+            <label>${f.home}</label>
+            <input id="pred_home_${i}" type="number" class="w-12 text-center border p-1 rounded" />
+            <span>:</span>
+            <input id="pred_away_${i}" type="number" class="w-12 text-center border p-1 rounded" />
+            <label>${f.away}</label>
+          `;
+
+        row.innerHTML = inputFields;
+        container.appendChild(row);
+      });
+
+      // Show others' predictions if this player has submitted
+      if (existing) {
+        players.forEach(player => {
+          if (player === currentPlayer) return;
+          const preds = JSON.parse(localStorage.getItem(`gw_${gw}_predictions_${player}`) || "null");
+          if (!preds) return;
+          const label = document.createElement("h3");
+          label.textContent = `${player.charAt(0).toUpperCase() + player.slice(1)}'s Predictions:`;
+          label.className = "font-bold mt-4";
+          container.appendChild(label);
+
+          preds.forEach((p, i) => {
+            const pEl = document.createElement("div");
+            pEl.textContent = `${fixtureData[i].home} ${p.home} : ${p.away} ${fixtureData[i].away}`;
+            container.appendChild(pEl);
+          });
+        });
+      }
+    }
+
+    // Results
+    document.getElementById("submitResults").addEventListener("click", () => {
+      const gw = gwSelect.value;
+      const fixtureData = getFixtureData(gw);
+      const results = fixtureData.map((f, i) => {
+        const home = parseInt(document.getElementById(`res_home_${i}`).value);
+        const away = parseInt(document.getElementById(`res_away_${i}`).value);
+        return { home, away };
+      });
+      localStorage.setItem(`gw_${gw}_results`, JSON.stringify(results));
+      updateLeaderboard();
+    });
+
+    function loadResults(gw) {
+      const fixtureData = getFixtureData(gw);
+      const results = JSON.parse(localStorage.getItem(`gw_${gw}_results`) || "[]");
+      const container = document.getElementById("results");
+      container.innerHTML = "";
+      fixtureData.forEach((f, i) => {
+        const row = document.createElement("div");
+        row.className = "flex gap-2 items-center mb-2";
+        row.innerHTML = `
+          <label>${f.home}</label>
+          <input id="res_home_${i}" type="number" class="w-12 border p-1 rounded" value="${results[i]?.home ?? ""}" />
+          <span>:</span>
+          <input id="res_away_${i}" type="number" class="w-12 border p-1 rounded" value="${results[i]?.away ?? ""}" />
+          <label>${f.away}</label>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function updateLeaderboard() {
+      const scores = {};
+      players.forEach(p => scores[p] = 0);
+      for (let gw = 1; gw <= totalGameWeeks; gw++) {
+        const fixtures = JSON.parse(localStorage.getItem(`gw_${gw}_fixtures`) || "[]");
+        const results = JSON.parse(localStorage.getItem(`gw_${gw}_results`) || "[]");
+        if (!results.length) continue;
+        players.forEach(player => {
+          const preds = JSON.parse(localStorage.getItem(`gw_${gw}_predictions_${player}`) || "null");
+          if (!preds) return;
+          preds.forEach((p, i) => {
+            const actual = results[i];
+            if (!actual) return;
+            let score = 0;
+            if (p.home === actual.home) score++;
+            if (p.away === actual.away) score++;
+            const predDiff = p.home - p.away;
+            const actualDiff = actual.home - actual.away;
+            if ((predDiff === 0 && actualDiff === 0) || (predDiff * actualDiff > 0)) score += 2;
+            if (p.home === actual.home && p.away === actual.away) score++;
+            scores[player] += score;
+          });
+        });
+      }
+      const board = document.getElementById("leaderboard");
+      board.innerHTML = Object.entries(scores)
+        .sort((a, b) => b[1] - a[1])
+        .map(([p, s]) => `<div><strong>${p.charAt(0).toUpperCase() + p.slice(1)}:</strong> ${s} pts</div>`)
+        .join("");
+    }
+  </script>
+</body>
+</html>
