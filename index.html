@@ -1,206 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
   <title>Premier League Prediction Game</title>
-  <script defer>
-    let currentPlayer = "";
-    let currentWeek = "";
-
-    const players = ["david", "katja", "mark", "jus"];
-
-    function safeJSON(key) {
-      try {
-        return JSON.parse(localStorage.getItem(key));
-      } catch {
-        return null;
-      }
-    }
-
-    function getFixtures(week) {
-      return safeJSON(`gw_${week}_fixtures`) || [];
-    }
-
-    function loadFixtures(week) {
-      fixturesDiv.innerHTML = "";
-      const fixtures = getFixtures(week);
-      fixtures.forEach((f, i) => {
-        const item = document.createElement("div");
-        item.textContent = `${f.home} vs ${f.away}`;
-        fixturesDiv.appendChild(item);
-      });
-    }
-
-    function loadPredictions(player, week) {
-      predictionsDiv.innerHTML = "";
-      const fixtures = getFixtures(week);
-      const predictions = safeJSON(`gw_${week}_predictions_${player}`) || [];
-
-      fixtures.forEach((f, i) => {
-        const pred = predictions[i] || { home: "", away: "" };
-        const row = document.createElement("div");
-        row.className = "flex gap-2 items-center mb-2";
-        row.innerHTML = `
-          <label class="w-32">${f.home}</label>
-          <input id="ph_${i}" type="number" class="w-12 border p-1 rounded" value="${pred.home}">
-          <span>:</span>
-          <input id="pa_${i}" type="number" class="w-12 border p-1 rounded" value="${pred.away}">
-          <label class="w-32">${f.away}</label>`;
-        predictionsDiv.appendChild(row);
-      });
-    }
-
-    function loadResults(week) {
-      resultsDiv.innerHTML = "";
-      const fixtures = getFixtures(week);
-      const results = safeJSON(`gw_${week}_results`) || [];
-
-      fixtures.forEach((f, i) => {
-        const res = results[i] || { home: "", away: "" };
-        const row = document.createElement("div");
-        row.className = "flex gap-2 items-center mb-2";
-        row.innerHTML = `
-          <label class="w-32">${f.home}</label>
-          <input id="res_h_${i}" type="number" class="w-12 border p-1 rounded" value="${res.home}">
-          <span>:</span>
-          <input id="res_a_${i}" type="number" class="w-12 border p-1 rounded" value="${res.away}">
-          <label class="w-32">${f.away}</label>`;
-        resultsDiv.appendChild(row);
-      });
-    }
-
-    function submitPredictions() {
-      const week = currentWeek;
-      const player = currentPlayer;
-      const fixtures = getFixtures(week);
-      const predictions = fixtures.map((_, i) => ({
-        home: document.getElementById(`ph_${i}`).value,
-        away: document.getElementById(`pa_${i}`).value
-      }));
-      localStorage.setItem(`gw_${week}_predictions_${player}`, JSON.stringify(predictions));
-      alert("Predictions saved.");
-      loadAllPredictions(week);
-    }
-
-    function submitResults() {
-      const week = currentWeek;
-      const fixtures = getFixtures(week);
-      const results = fixtures.map((_, i) => ({
-        home: document.getElementById(`res_h_${i}`).value,
-        away: document.getElementById(`res_a_${i}`).value
-      }));
-      localStorage.setItem(`gw_${week}_results`, JSON.stringify(results));
-      alert("Results saved.");
-      updateLeaderboard();
-    }
-
-    function loadAllPredictions(week) {
-      allPredictionsDiv.innerHTML = "";
-      const fixtures = getFixtures(week);
-      players.forEach(player => {
-        const predictions = safeJSON(`gw_${week}_predictions_${player}`) || [];
-        const section = document.createElement("div");
-        section.innerHTML = `<h4 class="font-bold mt-4 capitalize">${player}</h4>`;
-        predictions.forEach((p, i) => {
-          const f = fixtures[i];
-          const item = document.createElement("div");
-          item.textContent = `${f.home} ${p.home} : ${p.away} ${f.away}`;
-          section.appendChild(item);
-        });
-        allPredictionsDiv.appendChild(section);
-      });
-    }
-
-    function updateLeaderboard() {
-      leaderboardDiv.innerHTML = "";
-      const scores = {};
-      players.forEach(p => scores[p] = 0);
-      for (let w = 1; w <= 38; w++) {
-        const fixtures = getFixtures(w);
-        const results = safeJSON(`gw_${w}_results`);
-        if (!results || results.length !== fixtures.length) continue;
-
-        players.forEach(player => {
-          const predictions = safeJSON(`gw_${w}_predictions_${player}`);
-          if (!predictions || predictions.length !== fixtures.length) return;
-
-          predictions.forEach((p, i) => {
-            const r = results[i];
-            if (p.home === r.home) scores[player]++;
-            if (p.away === r.away) scores[player]++;
-            const predOutcome = outcome(p.home, p.away);
-            const realOutcome = outcome(r.home, r.away);
-            if (predOutcome === realOutcome) scores[player] += 2;
-            if (p.home === r.home && p.away === r.away) scores[player]++;
-          });
-        });
-      }
-      Object.entries(scores).forEach(([p, score]) => {
-        const item = document.createElement("div");
-        item.textContent = `${capitalize(p)}: ${score} pts`;
-        leaderboardDiv.appendChild(item);
-      });
-    }
-
-    function outcome(h, a) {
-      if (h > a) return "H";
-      if (h < a) return "A";
-      return "D";
-    }
-
-    function capitalize(s) {
-      return s.charAt(0).toUpperCase() + s.slice(1);
-    }
-
-    window.addEventListener("DOMContentLoaded", () => {
-      document.getElementById("player").addEventListener("change", e => {
-        currentPlayer = e.target.value;
-        if (currentPlayer && currentWeek) {
-          loadFixtures(currentWeek);
-          loadPredictions(currentPlayer, currentWeek);
-          loadResults(currentWeek);
-          loadAllPredictions(currentWeek);
-        }
-      });
-
-      document.getElementById("week").addEventListener("change", e => {
-        currentWeek = e.target.value;
-        if (currentPlayer && currentWeek) {
-          loadFixtures(currentWeek);
-          loadPredictions(currentPlayer, currentWeek);
-          loadResults(currentWeek);
-          loadAllPredictions(currentWeek);
-        }
-      });
-
-      document.getElementById("submitPredictions").addEventListener("click", submitPredictions);
-      document.getElementById("submitResults").addEventListener("click", submitResults);
-
-      document.getElementById("addFixture").addEventListener("click", () => {
-        const home = document.getElementById("homeTeam").value.trim();
-        const away = document.getElementById("awayTeam").value.trim();
-        if (!home || !away || !currentWeek) return alert("Missing info.");
-        const fixtures = getFixtures(currentWeek);
-        fixtures.push({ home, away });
-        localStorage.setItem(`gw_${currentWeek}_fixtures`, JSON.stringify(fixtures));
-        loadFixtures(currentWeek);
-        loadPredictions(currentPlayer, currentWeek);
-        loadResults(currentWeek);
-        loadAllPredictions(currentWeek);
-      });
-
-      updateLeaderboard();
-    });
-  </script>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 text-gray-800 p-4">
+<body class="bg-gray-100 p-6 text-gray-800">
   <div class="max-w-3xl mx-auto bg-white p-6 rounded shadow">
     <h1 class="text-2xl font-bold mb-4">Premier League Prediction Game</h1>
-    <div class="grid grid-cols-2 gap-4 mb-4">
+
+    <div class="grid grid-cols-2 gap-4 mb-6">
       <div>
-        <label for="player" class="block font-bold mb-1">Player</label>
+        <label class="block font-semibold mb-1">Player</label>
         <select id="player" class="w-full border p-2 rounded">
           <option value="">-- Select Player --</option>
           <option value="david">David</option>
@@ -210,10 +21,47 @@
         </select>
       </div>
       <div>
-        <label for="week" class="block font-bold mb-1">Game Week</label>
+        <label class="block font-semibold mb-1">Game Week</label>
         <select id="week" class="w-full border p-2 rounded">
           <option value="">-- Select Week --</option>
-          ${[...Array(38).keys()].map(i => `<option value="${i + 1}">Week ${i + 1}</option>`).join("")}
+          <option value="1">Week 1</option>
+          <option value="2">Week 2</option>
+          <option value="3">Week 3</option>
+          <option value="4">Week 4</option>
+          <option value="5">Week 5</option>
+          <option value="6">Week 6</option>
+          <option value="7">Week 7</option>
+          <option value="8">Week 8</option>
+          <option value="9">Week 9</option>
+          <option value="10">Week 10</option>
+          <option value="11">Week 11</option>
+          <option value="12">Week 12</option>
+          <option value="13">Week 13</option>
+          <option value="14">Week 14</option>
+          <option value="15">Week 15</option>
+          <option value="16">Week 16</option>
+          <option value="17">Week 17</option>
+          <option value="18">Week 18</option>
+          <option value="19">Week 19</option>
+          <option value="20">Week 20</option>
+          <option value="21">Week 21</option>
+          <option value="22">Week 22</option>
+          <option value="23">Week 23</option>
+          <option value="24">Week 24</option>
+          <option value="25">Week 25</option>
+          <option value="26">Week 26</option>
+          <option value="27">Week 27</option>
+          <option value="28">Week 28</option>
+          <option value="29">Week 29</option>
+          <option value="30">Week 30</option>
+          <option value="31">Week 31</option>
+          <option value="32">Week 32</option>
+          <option value="33">Week 33</option>
+          <option value="34">Week 34</option>
+          <option value="35">Week 35</option>
+          <option value="36">Week 36</option>
+          <option value="37">Week 37</option>
+          <option value="38">Week 38</option>
         </select>
       </div>
     </div>
@@ -221,23 +69,23 @@
     <div class="mb-6">
       <h2 class="text-xl font-semibold mb-2">Add Fixture</h2>
       <div class="flex gap-2 mb-2">
-        <input id="homeTeam" placeholder="Home Team" class="flex-1 border p-2 rounded"/>
-        <input id="awayTeam" placeholder="Away Team" class="flex-1 border p-2 rounded"/>
+        <input id="homeTeam" placeholder="Home Team" class="flex-1 border p-2 rounded">
+        <input id="awayTeam" placeholder="Away Team" class="flex-1 border p-2 rounded">
         <button id="addFixture" class="bg-blue-500 text-white px-4 py-2 rounded">Add</button>
       </div>
-      <div id="fixturesDiv" class="mb-4"></div>
+      <div id="fixturesDiv" class="text-sm text-gray-600"></div>
     </div>
 
     <div class="mb-6">
       <h2 class="text-xl font-semibold mb-2">Your Predictions</h2>
-      <div id="predictionsDiv" class="mb-2"></div>
-      <button id="submitPredictions" class="bg-green-600 text-white px-4 py-2 rounded">Submit Predictions</button>
+      <div id="predictionsDiv"></div>
+      <button id="submitPredictions" class="mt-2 bg-green-600 text-white px-4 py-2 rounded">Submit Predictions</button>
     </div>
 
     <div class="mb-6">
       <h2 class="text-xl font-semibold mb-2">Actual Results</h2>
-      <div id="resultsDiv" class="mb-2"></div>
-      <button id="submitResults" class="bg-purple-600 text-white px-4 py-2 rounded">Submit Results</button>
+      <div id="resultsDiv"></div>
+      <button id="submitResults" class="mt-2 bg-purple-600 text-white px-4 py-2 rounded">Submit Results</button>
     </div>
 
     <div class="mb-6">
@@ -250,5 +98,134 @@
       <div id="leaderboardDiv"></div>
     </div>
   </div>
-</body>
-</html>
+
+  <script>
+    const players = ["david", "katja", "mark", "jus"];
+    const playerEl = document.getElementById("player");
+    const weekEl = document.getElementById("week");
+    const fixturesDiv = document.getElementById("fixturesDiv");
+    const predictionsDiv = document.getElementById("predictionsDiv");
+    const resultsDiv = document.getElementById("resultsDiv");
+    const allPredictionsDiv = document.getElementById("allPredictionsDiv");
+    const leaderboardDiv = document.getElementById("leaderboardDiv");
+
+    let currentPlayer = "";
+    let currentWeek = "";
+
+    function safeJSON(key) {
+      try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
+    }
+
+    function getFixtures(week) {
+      return safeJSON(`gw_${week}_fixtures`) || [];
+    }
+
+    function renderFixtures() {
+      fixturesDiv.innerHTML = getFixtures(currentWeek)
+        .map(f => `<div>${f.home} vs ${f.away}</div>`).join("");
+    }
+
+    function renderPredictions() {
+      predictionsDiv.innerHTML = "";
+      const fixtures = getFixtures(currentWeek);
+      const saved = safeJSON(`gw_${currentWeek}_predictions_${currentPlayer}`) || [];
+
+      fixtures.forEach((f, i) => {
+        const pred = saved[i] || { home: "", away: "" };
+        predictionsDiv.innerHTML += `
+          <div class="flex gap-2 items-center mb-2">
+            <label class="w-32">${f.home}</label>
+            <input id="ph_${i}" type="number" class="w-12 border p-1 rounded" value="${pred.home}"/>
+            <span>:</span>
+            <input id="pa_${i}" type="number" class="w-12 border p-1 rounded" value="${pred.away}"/>
+            <label class="w-32">${f.away}</label>
+          </div>`;
+      });
+    }
+
+    function renderResults() {
+      resultsDiv.innerHTML = "";
+      const fixtures = getFixtures(currentWeek);
+      const saved = safeJSON(`gw_${currentWeek}_results`) || [];
+
+      fixtures.forEach((f, i) => {
+        const res = saved[i] || { home: "", away: "" };
+        resultsDiv.innerHTML += `
+          <div class="flex gap-2 items-center mb-2">
+            <label class="w-32">${f.home}</label>
+            <input id="rh_${i}" type="number" class="w-12 border p-1 rounded" value="${res.home}"/>
+            <span>:</span>
+            <input id="ra_${i}" type="number" class="w-12 border p-1 rounded" value="${res.away}"/>
+            <label class="w-32">${f.away}</label>
+          </div>`;
+      });
+    }
+
+    function renderAllPredictions() {
+      allPredictionsDiv.innerHTML = "";
+      const fixtures = getFixtures(currentWeek);
+      players.forEach(p => {
+        const saved = safeJSON(`gw_${currentWeek}_predictions_${p}`) || [];
+        if (!saved.length) return;
+        let html = `<h3 class="capitalize font-semibold">${p}</h3>`;
+        saved.forEach((s, i) => html += `<div>${fixtures[i].home} ${s.home}:${s.away} ${fixtures[i].away}</div>`);
+        allPredictionsDiv.innerHTML += html;
+      });
+    }
+
+    function updateLeaderboard() {
+      leaderboardDiv.innerHTML = "";
+      const fixtures = getFixtures(currentWeek);
+      const results = safeJSON(`gw_${currentWeek}_results`) || [];
+      const scores = {};
+      players.forEach(p => { scores[p] = 0; });
+      players.forEach(p => {
+        const saved = safeJSON(`gw_${currentWeek}_predictions_${p}`) || [];
+        saved.forEach((s, i) => {
+          const r = results[i];
+          if (!r) return;
+          if (s.home == r.home) scores[p]++;
+          if (s.away == r.away) scores[p]++;
+          const po = s.home - s.away;
+          const ro = r.home - r.away;
+          if ((po > 0 && ro > 0) || (po < 0 && ro < 0) || (po == 0 && ro == 0)) scores[p]+=2;
+          if (s.home == r.home && s.away == r.away) scores[p]++;
+        });
+      });
+      for (const p of players) {
+        leaderboardDiv.innerHTML += `<div class="capitalize">${p}: ${scores[p]} pts</div>`;
+      }
+    }
+
+    function handleChange() {
+      currentPlayer = playerEl.value;
+      currentWeek = weekEl.value;
+      if (!currentPlayer || !currentWeek) return;
+      renderFixtures();
+      renderPredictions();
+      renderResults();
+      renderAllPredictions();
+      updateLeaderboard();
+    }
+
+    playerEl.onchange = weekEl.onchange = handleChange;
+
+    document.getElementById("addFixture").onclick = () => {
+      if (!currentWeek) return alert("Select week");
+      const home = document.getElementById("homeTeam").value.trim();
+      const away = document.getElementById("awayTeam").value.trim();
+      if (!home||!away) return alert("Enter both teams");
+      const fixtures = getFixtures(currentWeek);
+      fixtures.push({ home, away });
+      localStorage.setItem(`gw_${currentWeek}_fixtures`, JSON.stringify(fixtures));
+      renderFixtures();
+      renderPredictions();
+      renderResults();
+    };
+
+    document.getElementById("submitPredictions").onclick = () => {
+      const fixtures = getFixtures(currentWeek);
+      const preds = fixtures.map((_, i) => ({
+        home: document.getElementById(`ph_${i}`).value || "0",
+        away: document.getElementById(`pa_${i}`).value || "0"
+     
