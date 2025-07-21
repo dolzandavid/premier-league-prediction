@@ -99,6 +99,16 @@
       `;
       document.getElementById("fixtures").appendChild(div);
     });
+    // Auto-save fixtures whenever they change
+const fixturesContainer = document.getElementById('fixtures');
+
+// Listen for input changes on fixtures container
+fixturesContainer.addEventListener('input', () => {
+  if (!gwSelect.value) return;
+  saveFixtures(gwSelect.value);
+  loadPredictions(gwSelect.value);
+});
+
 
     function saveFixtures(gw) {
       const fixtureEls = document.querySelectorAll("#fixtures > div");
