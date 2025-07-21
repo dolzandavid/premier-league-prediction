@@ -24,8 +24,7 @@
         <label class="block font-semibold mb-1" for="week">Game Week</label>
         <select id="week" class="w-full border p-2 rounded">
           <option value="">-- Select Week --</option>
-          <!-- 38 weeks -->
-          ${Array(38).fill(0).map((_,i)=>`<option value="${i+1}">Week ${i+1}</option>`).join('')}
+          <!-- options will be added dynamically -->
         </select>
       </div>
     </div>
@@ -64,17 +63,6 @@
   </div>
 
   <script>
-    // Manual populate week options (since template literals don't work in static HTML)
-    const weekSelect = document.getElementById("week");
-    if (weekSelect.options.length === 1) { // only placeholder exists
-      for (let i = 1; i <= 38; i++) {
-        const opt = document.createElement("option");
-        opt.value = i;
-        opt.textContent = `Week ${i}`;
-        weekSelect.appendChild(opt);
-      }
-    }
-
     const players = ["david", "katja", "mark", "jus"];
     const playerEl = document.getElementById("player");
     const weekEl = document.getElementById("week");
@@ -86,6 +74,16 @@
 
     let currentPlayer = "";
     let currentWeek = "";
+
+    // Populate week dropdown dynamically on DOMContentLoaded
+    document.addEventListener("DOMContentLoaded", () => {
+      for (let i = 1; i <= 38; i++) {
+        const opt = document.createElement("option");
+        opt.value = i;
+        opt.textContent = `Week ${i}`;
+        weekEl.appendChild(opt);
+      }
+    });
 
     function safeJSON(key) {
       try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
@@ -243,6 +241,7 @@
       renderPredictions();
       renderResults();
       renderAllPredictions();
+      updateLeaderboard();
     });
 
     document.getElementById("submitPredictions").addEventListener("click", () => {
@@ -295,7 +294,7 @@
       updateLeaderboard();
     });
 
-    // Initialize empty page text
+    // Initialize placeholders before any selection
     fixturesDiv.textContent = "Select player and week.";
     predictionsDiv.textContent = "";
     resultsDiv.textContent = "";
