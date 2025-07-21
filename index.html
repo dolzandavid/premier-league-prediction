@@ -31,7 +31,7 @@
 
     <div class="mb-6">
       <h2 class="text-xl font-semibold mb-2">Add Fixture</h2>
-      <div class="flex gap-2 mb-2">
+      <div id="fixtureControls" class="flex gap-2 mb-2">
         <input id="homeTeam" placeholder="Home Team" class="flex-1 border p-2 rounded" />
         <input id="awayTeam" placeholder="Away Team" class="flex-1 border p-2 rounded" />
         <button id="addFixture" class="bg-blue-500 text-white px-4 py-2 rounded">Add</button>
@@ -52,6 +52,11 @@
     </div>
 
     <div class="mb-6">
+      <h2 class="text-xl font-semibold mb-2">Points per Fixture (after results submitted)</h2>
+      <div id="pointsPerFixtureDiv" class="text-sm text-gray-700"></div>
+    </div>
+
+    <div class="mb-6">
       <h2 class="text-xl font-semibold mb-2">All Predictions</h2>
       <div id="allPredictionsDiv"></div>
     </div>
@@ -59,6 +64,7 @@
     <div class="mb-6">
       <h2 class="text-xl font-semibold mb-2">Leaderboard</h2>
       <div id="leaderboardDiv"></div>
+      <div id="overallLeaderboardDiv" class="mt-4 border-t pt-4 text-gray-700"></div>
     </div>
   </div>
 
@@ -71,6 +77,9 @@
     const resultsDiv = document.getElementById("resultsDiv");
     const allPredictionsDiv = document.getElementById("allPredictionsDiv");
     const leaderboardDiv = document.getElementById("leaderboardDiv");
+    const overallLeaderboardDiv = document.getElementById("overallLeaderboardDiv");
+    const pointsPerFixtureDiv = document.getElementById("pointsPerFixtureDiv");
+    const fixtureControls = document.getElementById("fixtureControls");
 
     let currentPlayer = "";
     let currentWeek = "";
@@ -83,6 +92,7 @@
         opt.textContent = `Week ${i}`;
         weekEl.appendChild(opt);
       }
+      updateFixtureControlsVisibility();
     });
 
     function safeJSON(key) {
@@ -101,9 +111,34 @@
       const fixtures = getFixtures(currentWeek);
       if (fixtures.length === 0) {
         fixturesDiv.textContent = "No fixtures added for this week.";
-      } else {
-        fixturesDiv.innerHTML = fixtures.map(f => `<div>${f.home} vs ${f.away}</div>`).join("");
+        return;
       }
+      fixturesDiv.innerHTML = "";
+      fixtures.forEach((f, i) => {
+        const div = document.createElement("div");
+        div.className = "flex justify-between items-center border-b py-1";
+        div.innerHTML = `<span>${f.home} vs ${f.away}</span>`;
+        // Only David sees delete button
+        if (currentPlayer === "david") {
+          const delBtn = document.createElement("button");
+          delBtn.textContent = "Delete";
+          delBtn.className = "ml-4 bg-red-500 text-white px-2 py-1 rounded text-xs";
+          delBtn.addEventListener("click", () => {
+            if(confirm(`Delete fixture: ${f.home} vs ${f.away}?`)) {
+              fixtures.splice(i, 1);
+              saveFixtures(currentWeek, fixtures);
+              renderFixtures();
+              renderPredictions();
+              renderResults();
+              renderAllPredictions();
+              renderPointsPerFixture();
+              updateLeaderboard();
+            }
+          });
+          div.appendChild(delBtn);
+        }
+        fixturesDiv.appendChild(div);
+      });
     }
 
     function renderPredictions() {
@@ -123,9 +158,9 @@
         predictionsDiv.innerHTML += `
           <div class="flex gap-2 items-center mb-2">
             <label class="w-32">${f.home}</label>
-            <input id="ph_${i}" type="number" class="w-12 border p-1 rounded" value="${pred.home}" min="0"/>
+            <input id="ph_${i}" type="number" class="w-12 border p-1 rounded" value="${pred.home}" min="0" />
             <span>:</span>
-            <input id="pa_${i}" type="number" class="w-12 border p-1 rounded" value="${pred.away}" min="0"/>
+            <input id="pa_${i}" type="number" class="w-12 border p-1 rounded" value="${pred.away}" min="0" />
             <label class="w-32">${f.away}</label>
           </div>`;
       });
@@ -144,9 +179,9 @@
         resultsDiv.innerHTML += `
           <div class="flex gap-2 items-center mb-2">
             <label class="w-32">${f.home}</label>
-            <input id="rh_${i}" type="number" class="w-12 border p-1 rounded" value="${res.home}" min="0"/>
+            <input id="rh_${i}" type="number" class="w-12 border p-1 rounded" value="${res.home}" min="0" />
             <span>:</span>
-            <input id="ra_${i}" type="number" class="w-12 border p-1 rounded" value="${res.away}" min="0"/>
+            <input id="ra_${i}" type="number" class="w-12 border p-1 rounded" value="${res.away}" min="0" />
             <label class="w-32">${f.away}</label>
           </div>`;
       });
@@ -170,6 +205,49 @@
       });
     }
 
+    // Calculate points for one prediction vs actual result for a fixture
+    function calculatePoints(pred, actual) {
+      let points = 0;
+      if (pred.home === actual.home) points++;
+      if (pred.away === actual.away) points++;
+      const predDiff = pred.home - pred.away;
+      const actualDiff = actual.home - actual.away;
+      if ((predDiff === 0 && actualDiff === 0) || (predDiff * actualDiff > 0)) points += 2;
+      if (pred.home === actual.home && pred.away === actual.away) points++;
+      return points;
+    }
+
+    function renderPointsPerFixture() {
+      pointsPerFixtureDiv.innerHTML = "";
+      const fixtures = getFixtures(currentWeek);
+      const results = safeJSON(`gw_${currentWeek}_results`) || [];
+      if (fixtures.length === 0 || results.length === 0) {
+        pointsPerFixtureDiv.textContent = "Add fixtures and results to see points per fixture.";
+        return;
+      }
+      // Header row with fixture names
+      let html = "<table class='w-full border border-collapse text-sm'><thead><tr><th class='border px-2 py-1'>Player</th>";
+      fixtures.forEach((f, i) => {
+        html += `<th class="border px-2 py-1">${f.home} vs ${f.away}</th>`;
+      });
+      html += "</tr></thead><tbody>";
+      players.forEach(p => {
+        const preds = safeJSON(`gw_${currentWeek}_predictions_${p}`) || [];
+        html += `<tr><td class="border px-2 py-1 capitalize font-semibold">${p}</td>`;
+        fixtures.forEach((_, i) => {
+          if (preds[i] && results[i]) {
+            const pts = calculatePoints(preds[i], results[i]);
+            html += `<td class="border px-2 py-1 text-center">${pts}</td>`;
+          } else {
+            html += `<td class="border px-2 py-1 text-center">-</td>`;
+          }
+        });
+        html += "</tr>";
+      });
+      html += "</tbody></table>";
+      pointsPerFixtureDiv.innerHTML = html;
+    }
+
     function updateLeaderboard() {
       leaderboardDiv.innerHTML = "";
       const fixtures = getFixtures(currentWeek);
@@ -185,36 +263,69 @@
         saved.forEach((s, i) => {
           const r = results[i];
           if (!r) return;
-          let score = 0;
-          if (s.home == r.home) score++;
-          if (s.away == r.away) score++;
-          const predDiff = s.home - s.away;
-          const resDiff = r.home - r.away;
-          if ((predDiff === 0 && resDiff === 0) || (predDiff * resDiff > 0)) score += 2;
-          if (s.home == r.home && s.away == r.away) score++;
-          scores[p] += score;
+          scores[p] += calculatePoints(s, r);
         });
       });
-      for (const p of players) {
-        leaderboardDiv.innerHTML += `<div class="capitalize font-semibold">${p}: ${scores[p]} pts</div>`;
+      // Sort descending
+      const sorted = Object.entries(scores).sort((a,b) => b[1] - a[1]);
+      let html = "<h3 class='font-semibold mb-2'>Leaderboard for Week " + currentWeek + "</h3>";
+      sorted.forEach(([p, s]) => {
+        html += `<div class="capitalize font-semibold">${p}: ${s} pts</div>`;
+      });
+      leaderboardDiv.innerHTML = html;
+
+      // Overall leaderboard over all weeks
+      const overallScores = {};
+      players.forEach(p => overallScores[p] = 0);
+      for(let w=1; w<=38; w++) {
+        const weekFixtures = getFixtures(w);
+        const weekResults = safeJSON(`gw_${w}_results`) || [];
+        if (weekFixtures.length === 0 || weekResults.length === 0) continue;
+        players.forEach(p => {
+          const weekPreds = safeJSON(`gw_${w}_predictions_${p}`) || [];
+          weekPreds.forEach((pred, i) => {
+            const actual = weekResults[i];
+            if (!actual) return;
+            overallScores[p] += calculatePoints(pred, actual);
+          });
+        });
+      }
+      const sortedOverall = Object.entries(overallScores).sort((a,b) => b[1] - a[1]);
+      let overallHtml = "<h3 class='font-semibold mb-2'>Overall Leaderboard</h3>";
+      sortedOverall.forEach(([p, s]) => {
+        overallHtml += `<div class="capitalize font-semibold">${p}: ${s} pts</div>`;
+      });
+      overallLeaderboardDiv.innerHTML = overallHtml;
+    }
+
+    function updateFixtureControlsVisibility() {
+      // Only David can add/delete fixtures => show/hide fixtureControls and delete buttons dynamically handled in renderFixtures()
+      if (currentPlayer === "david") {
+        fixtureControls.style.display = "flex";
+      } else {
+        fixtureControls.style.display = "none";
       }
     }
 
     function handleChange() {
       currentPlayer = playerEl.value;
       currentWeek = weekEl.value;
+      updateFixtureControlsVisibility();
       if (!currentPlayer || !currentWeek) {
         fixturesDiv.textContent = "Select player and week.";
         predictionsDiv.textContent = "";
         resultsDiv.textContent = "";
         allPredictionsDiv.textContent = "";
+        pointsPerFixtureDiv.textContent = "";
         leaderboardDiv.textContent = "";
+        overallLeaderboardDiv.textContent = "";
         return;
       }
       renderFixtures();
       renderPredictions();
       renderResults();
       renderAllPredictions();
+      renderPointsPerFixture();
       updateLeaderboard();
     }
 
@@ -224,6 +335,10 @@
     document.getElementById("addFixture").addEventListener("click", () => {
       if (!currentWeek) {
         alert("Please select a game week first.");
+        return;
+      }
+      if (currentPlayer !== "david") {
+        alert("Only David can add fixtures.");
         return;
       }
       const home = document.getElementById("homeTeam").value.trim();
@@ -241,6 +356,7 @@
       renderPredictions();
       renderResults();
       renderAllPredictions();
+      renderPointsPerFixture();
       updateLeaderboard();
     });
 
@@ -267,12 +383,17 @@
       alert("Predictions saved!");
       renderPredictions();
       renderAllPredictions();
+      renderPointsPerFixture();
       updateLeaderboard();
     });
 
     document.getElementById("submitResults").addEventListener("click", () => {
       if (!currentWeek) {
         alert("Please select a game week first.");
+        return;
+      }
+      if (currentPlayer !== "david") {
+        alert("Only David can submit results.");
         return;
       }
       const fixtures = getFixtures(currentWeek);
@@ -291,6 +412,8 @@
       });
       localStorage.setItem(`gw_${currentWeek}_results`, JSON.stringify(res));
       alert("Results saved!");
+      renderResults();
+      renderPointsPerFixture();
       updateLeaderboard();
     });
 
@@ -299,7 +422,6 @@
     predictionsDiv.textContent = "";
     resultsDiv.textContent = "";
     allPredictionsDiv.textContent = "";
+    pointsPerFixtureDiv.textContent = "";
     leaderboardDiv.textContent = "";
-  </script>
-</body>
-</html>
+    overallLeaderboard
