@@ -2,73 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Premier League Predictions</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 p-6 text-gray-800">
-  <div class="max-w-4xl mx-auto bg-white shadow-md rounded p-6">
-    <h1 class="text-2xl font-bold mb-4">Premier League Prediction Game</h1>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Premier League Prediction Game</title>
+  <script defer>
+    let currentPlayer = "";
+    let currentWeek = "";
 
-    <div class="grid grid-cols-2 gap-4 mb-6">
-      <div>
-        <label class="block font-semibold mb-1">Select Player</label>
-        <select id="player" class="w-full border p-2 rounded">
-          <option value="">-- Select Player --</option>
-          <option value="david">David</option>
-          <option value="katja">Katja</option>
-          <option value="mark">Mark</option>
-          <option value="jus">Jus</option>
-        </select>
-      </div>
-      <div>
-        <label class="block font-semibold mb-1">Game Week</label>
-        <select id="week" class="w-full border p-2 rounded">
-          <option value="">-- Select Week --</option>
-          ${Array.from({ length: 38 }, (_, i) => `<option value="${i + 1}">Week ${i + 1}</option>`).join("")}
-        </select>
-      </div>
-    </div>
-
-    <div class="mb-6">
-      <h2 class="text-xl font-bold mb-2">Add Fixture</h2>
-      <div class="flex gap-2 items-center mb-2">
-        <input id="homeTeam" placeholder="Home Team" class="border p-2 rounded w-1/3" />
-        <span>vs</span>
-        <input id="awayTeam" placeholder="Away Team" class="border p-2 rounded w-1/3" />
-        <button id="addFixtureBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Add</button>
-      </div>
-      <ul id="fixtureList" class="list-disc pl-5 text-sm text-gray-600"></ul>
-    </div>
-
-    <div id="predictionSection" class="mb-6">
-      <h2 class="text-xl font-bold mb-2">Your Predictions</h2>
-      <div id="predictionInputs"></div>
-    </div>
-
-    <div id="resultSection" class="mb-6">
-      <h2 class="text-xl font-bold mb-2">Actual Results</h2>
-      <div id="resultsInputs"></div>
-      <button id="submitResultsBtn" class="bg-green-600 text-white px-4 py-2 rounded mt-2">Submit Results</button>
-    </div>
-
-    <div id="scoresSection" class="mb-6">
-      <h2 class="text-xl font-bold mb-2">Scores</h2>
-      <div id="scoresTable" class="text-sm"></div>
-    </div>
-  </div>
-
-  <script>
     const players = ["david", "katja", "mark", "jus"];
-    const playerSelect = document.getElementById("player");
-    const weekSelect = document.getElementById("week");
-    const fixtureList = document.getElementById("fixtureList");
-    const predictionInputs = document.getElementById("predictionInputs");
-    const resultsInputs = document.getElementById("resultsInputs");
-    const scoresTable = document.getElementById("scoresTable");
-
-    function getKey(prefix, week, player = "") {
-      return `${prefix}_${week}${player ? "_" + player : ""}`;
-    }
 
     function safeJSON(key) {
       try {
@@ -78,69 +18,43 @@
       }
     }
 
-    function saveJSON(key, value) {
-      localStorage.setItem(key, JSON.stringify(value));
-    }
-
     function getFixtures(week) {
-      return safeJSON(getKey("fixtures", week)) || [];
+      return safeJSON(`gw_${week}_fixtures`) || [];
     }
 
-    function updateFixtures() {
-      const week = weekSelect.value;
+    function loadFixtures(week) {
+      fixturesDiv.innerHTML = "";
       const fixtures = getFixtures(week);
-      fixtureList.innerHTML = fixtures.map(f => `<li>${f.home} vs ${f.away}</li>`).join("");
+      fixtures.forEach((f, i) => {
+        const item = document.createElement("div");
+        item.textContent = `${f.home} vs ${f.away}`;
+        fixturesDiv.appendChild(item);
+      });
     }
 
-    function loadPredictions() {
-      predictionInputs.innerHTML = "";
-      const player = playerSelect.value;
-      const week = weekSelect.value;
-      if (!player || !week) return;
-
+    function loadPredictions(player, week) {
+      predictionsDiv.innerHTML = "";
       const fixtures = getFixtures(week);
-      const key = getKey("pred", week, player);
-      const saved = safeJSON(key) || [];
-
-      if (saved.length === fixtures.length) {
-        predictionInputs.innerHTML = "<p class='text-sm text-gray-600 mb-2'>You have already submitted predictions:</p>" +
-          fixtures.map((f, i) =>
-            `<div class="mb-1">${f.home} ${saved[i].home} : ${saved[i].away} ${f.away}</div>`).join("") +
-          "<p class='text-sm text-gray-500 mt-2'>Others' predictions will be visible after all have submitted.</p>";
-        return;
-      }
+      const predictions = safeJSON(`gw_${week}_predictions_${player}`) || [];
 
       fixtures.forEach((f, i) => {
+        const pred = predictions[i] || { home: "", away: "" };
         const row = document.createElement("div");
         row.className = "flex gap-2 items-center mb-2";
         row.innerHTML = `
           <label class="w-32">${f.home}</label>
-          <input type="number" id="pred_h_${i}" class="w-12 border p-1 rounded" />
+          <input id="ph_${i}" type="number" class="w-12 border p-1 rounded" value="${pred.home}">
           <span>:</span>
-          <input type="number" id="pred_a_${i}" class="w-12 border p-1 rounded" />
+          <input id="pa_${i}" type="number" class="w-12 border p-1 rounded" value="${pred.away}">
           <label class="w-32">${f.away}</label>`;
-        predictionInputs.appendChild(row);
+        predictionsDiv.appendChild(row);
       });
-
-      const btn = document.createElement("button");
-      btn.textContent = "Submit Predictions";
-      btn.className = "bg-blue-600 text-white px-4 py-2 rounded";
-      btn.onclick = () => {
-        const preds = fixtures.map((_, i) => ({
-          home: parseInt(document.getElementById("pred_h_" + i).value) || 0,
-          away: parseInt(document.getElementById("pred_a_" + i).value) || 0
-        }));
-        saveJSON(key, preds);
-        loadPredictions();
-        checkAllPredictionsSubmitted();
-      };
-      predictionInputs.appendChild(btn);
     }
 
     function loadResults(week) {
-      resultsInputs.innerHTML = "";
+      resultsDiv.innerHTML = "";
       const fixtures = getFixtures(week);
-      const results = safeJSON(getKey("results", week)) || [];
+      const results = safeJSON(`gw_${week}_results`) || [];
 
       fixtures.forEach((f, i) => {
         const res = results[i] || { home: "", away: "" };
@@ -152,79 +66,189 @@
           <span>:</span>
           <input id="res_a_${i}" type="number" class="w-12 border p-1 rounded" value="${res.away}">
           <label class="w-32">${f.away}</label>`;
-        resultsInputs.appendChild(row);
+        resultsDiv.appendChild(row);
       });
     }
 
-    function saveResults() {
-      const week = weekSelect.value;
+    function submitPredictions() {
+      const week = currentWeek;
+      const player = currentPlayer;
+      const fixtures = getFixtures(week);
+      const predictions = fixtures.map((_, i) => ({
+        home: document.getElementById(`ph_${i}`).value,
+        away: document.getElementById(`pa_${i}`).value
+      }));
+      localStorage.setItem(`gw_${week}_predictions_${player}`, JSON.stringify(predictions));
+      alert("Predictions saved.");
+      loadAllPredictions(week);
+    }
+
+    function submitResults() {
+      const week = currentWeek;
       const fixtures = getFixtures(week);
       const results = fixtures.map((_, i) => ({
-        home: parseInt(document.getElementById("res_h_" + i).value) || 0,
-        away: parseInt(document.getElementById("res_a_" + i).value) || 0
+        home: document.getElementById(`res_h_${i}`).value,
+        away: document.getElementById(`res_a_${i}`).value
       }));
-      saveJSON(getKey("results", week), results);
-      updateScores(week);
+      localStorage.setItem(`gw_${week}_results`, JSON.stringify(results));
+      alert("Results saved.");
+      updateLeaderboard();
     }
 
-    function updateScores(week) {
+    function loadAllPredictions(week) {
+      allPredictionsDiv.innerHTML = "";
       const fixtures = getFixtures(week);
-      const results = safeJSON(getKey("results", week)) || [];
-      let html = `<table class="table-auto border w-full"><thead><tr><th class="border px-2 py-1">Player</th><th class="border px-2 py-1">Points</th></tr></thead><tbody>`;
-      players.forEach(p => {
-        const preds = safeJSON(getKey("pred", week, p)) || [];
-        let score = 0;
-        preds.forEach((pred, i) => {
-          if (!results[i]) return;
-          if (pred.home === results[i].home) score++;
-          if (pred.away === results[i].away) score++;
-          const predOutcome = pred.home === pred.away ? "D" : pred.home > pred.away ? "H" : "A";
-          const actualOutcome = results[i].home === results[i].away ? "D" : results[i].home > results[i].away ? "H" : "A";
-          if (predOutcome === actualOutcome) score += 2;
-          if (pred.home === results[i].home && pred.away === results[i].away) score += 1;
+      players.forEach(player => {
+        const predictions = safeJSON(`gw_${week}_predictions_${player}`) || [];
+        const section = document.createElement("div");
+        section.innerHTML = `<h4 class="font-bold mt-4 capitalize">${player}</h4>`;
+        predictions.forEach((p, i) => {
+          const f = fixtures[i];
+          const item = document.createElement("div");
+          item.textContent = `${f.home} ${p.home} : ${p.away} ${f.away}`;
+          section.appendChild(item);
         });
-        html += `<tr><td class="border px-2 py-1">${p}</td><td class="border px-2 py-1">${score}</td></tr>`;
+        allPredictionsDiv.appendChild(section);
       });
-      html += "</tbody></table>";
-      scoresTable.innerHTML = html;
     }
 
-    function checkAllPredictionsSubmitted() {
-      const week = weekSelect.value;
-      const fixtures = getFixtures(week);
-      const allSubmitted = players.every(p => {
-        const preds = safeJSON(getKey("pred", week, p)) || [];
-        return preds.length === fixtures.length;
+    function updateLeaderboard() {
+      leaderboardDiv.innerHTML = "";
+      const scores = {};
+      players.forEach(p => scores[p] = 0);
+      for (let w = 1; w <= 38; w++) {
+        const fixtures = getFixtures(w);
+        const results = safeJSON(`gw_${w}_results`);
+        if (!results || results.length !== fixtures.length) continue;
+
+        players.forEach(player => {
+          const predictions = safeJSON(`gw_${w}_predictions_${player}`);
+          if (!predictions || predictions.length !== fixtures.length) return;
+
+          predictions.forEach((p, i) => {
+            const r = results[i];
+            if (p.home === r.home) scores[player]++;
+            if (p.away === r.away) scores[player]++;
+            const predOutcome = outcome(p.home, p.away);
+            const realOutcome = outcome(r.home, r.away);
+            if (predOutcome === realOutcome) scores[player] += 2;
+            if (p.home === r.home && p.away === r.away) scores[player]++;
+          });
+        });
+      }
+      Object.entries(scores).forEach(([p, score]) => {
+        const item = document.createElement("div");
+        item.textContent = `${capitalize(p)}: ${score} pts`;
+        leaderboardDiv.appendChild(item);
       });
-      if (allSubmitted) updateScores(week);
     }
 
-    document.getElementById("addFixtureBtn").onclick = () => {
-      const week = weekSelect.value;
-      const home = document.getElementById("homeTeam").value.trim();
-      const away = document.getElementById("awayTeam").value.trim();
-      if (!week || !home || !away) return alert("Fill all fields and select a week");
-      const fixtures = getFixtures(week);
-      fixtures.push({ home, away });
-      saveJSON(getKey("fixtures", week), fixtures);
-      updateFixtures();
-      loadPredictions();
-      loadResults(week);
-    };
+    function outcome(h, a) {
+      if (h > a) return "H";
+      if (h < a) return "A";
+      return "D";
+    }
 
-    document.getElementById("submitResultsBtn").onclick = saveResults;
+    function capitalize(s) {
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    }
 
-    playerSelect.onchange = () => {
-      updateFixtures();
-      loadPredictions();
-    };
+    window.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("player").addEventListener("change", e => {
+        currentPlayer = e.target.value;
+        if (currentPlayer && currentWeek) {
+          loadFixtures(currentWeek);
+          loadPredictions(currentPlayer, currentWeek);
+          loadResults(currentWeek);
+          loadAllPredictions(currentWeek);
+        }
+      });
 
-    weekSelect.onchange = () => {
-      updateFixtures();
-      loadPredictions();
-      loadResults(weekSelect.value);
-      checkAllPredictionsSubmitted();
-    };
+      document.getElementById("week").addEventListener("change", e => {
+        currentWeek = e.target.value;
+        if (currentPlayer && currentWeek) {
+          loadFixtures(currentWeek);
+          loadPredictions(currentPlayer, currentWeek);
+          loadResults(currentWeek);
+          loadAllPredictions(currentWeek);
+        }
+      });
+
+      document.getElementById("submitPredictions").addEventListener("click", submitPredictions);
+      document.getElementById("submitResults").addEventListener("click", submitResults);
+
+      document.getElementById("addFixture").addEventListener("click", () => {
+        const home = document.getElementById("homeTeam").value.trim();
+        const away = document.getElementById("awayTeam").value.trim();
+        if (!home || !away || !currentWeek) return alert("Missing info.");
+        const fixtures = getFixtures(currentWeek);
+        fixtures.push({ home, away });
+        localStorage.setItem(`gw_${currentWeek}_fixtures`, JSON.stringify(fixtures));
+        loadFixtures(currentWeek);
+        loadPredictions(currentPlayer, currentWeek);
+        loadResults(currentWeek);
+        loadAllPredictions(currentWeek);
+      });
+
+      updateLeaderboard();
+    });
   </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 p-4">
+  <div class="max-w-3xl mx-auto bg-white p-6 rounded shadow">
+    <h1 class="text-2xl font-bold mb-4">Premier League Prediction Game</h1>
+    <div class="grid grid-cols-2 gap-4 mb-4">
+      <div>
+        <label for="player" class="block font-bold mb-1">Player</label>
+        <select id="player" class="w-full border p-2 rounded">
+          <option value="">-- Select Player --</option>
+          <option value="david">David</option>
+          <option value="katja">Katja</option>
+          <option value="mark">Mark</option>
+          <option value="jus">Jus</option>
+        </select>
+      </div>
+      <div>
+        <label for="week" class="block font-bold mb-1">Game Week</label>
+        <select id="week" class="w-full border p-2 rounded">
+          <option value="">-- Select Week --</option>
+          ${[...Array(38).keys()].map(i => `<option value="${i + 1}">Week ${i + 1}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold mb-2">Add Fixture</h2>
+      <div class="flex gap-2 mb-2">
+        <input id="homeTeam" placeholder="Home Team" class="flex-1 border p-2 rounded"/>
+        <input id="awayTeam" placeholder="Away Team" class="flex-1 border p-2 rounded"/>
+        <button id="addFixture" class="bg-blue-500 text-white px-4 py-2 rounded">Add</button>
+      </div>
+      <div id="fixturesDiv" class="mb-4"></div>
+    </div>
+
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold mb-2">Your Predictions</h2>
+      <div id="predictionsDiv" class="mb-2"></div>
+      <button id="submitPredictions" class="bg-green-600 text-white px-4 py-2 rounded">Submit Predictions</button>
+    </div>
+
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold mb-2">Actual Results</h2>
+      <div id="resultsDiv" class="mb-2"></div>
+      <button id="submitResults" class="bg-purple-600 text-white px-4 py-2 rounded">Submit Results</button>
+    </div>
+
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold mb-2">All Predictions</h2>
+      <div id="allPredictionsDiv"></div>
+    </div>
+
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold mb-2">Leaderboard</h2>
+      <div id="leaderboardDiv"></div>
+    </div>
+  </div>
 </body>
 </html>
