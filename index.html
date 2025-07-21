@@ -3,23 +3,35 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Premier League Prediction Game</title>
+<title>Premier League Prediction Game - Login</title>
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 p-4 text-gray-900">
-<div class="max-w-4xl mx-auto">
-  <h1 class="text-2xl font-bold mb-4">Premier League Prediction Game</h1>
 
-  <!-- Login -->
-  <div class="mb-4">
-    <label for="playerSelect" class="font-semibold">Login as:</label>
-    <select id="playerSelect" class="ml-2 p-1 border rounded">
-      <option value="">Select player</option>
+<div id="loginPage" class="max-w-md mx-auto mt-20 bg-white p-6 rounded shadow">
+  <h1 class="text-2xl font-bold mb-6 text-center">Login to Prediction Game</h1>
+  <form id="loginForm" class="flex flex-col gap-4">
+    <label for="loginPlayer" class="font-semibold">Select Player:</label>
+    <select id="loginPlayer" required class="p-2 border rounded">
+      <option value="" disabled selected>Choose player</option>
       <option value="david">David</option>
       <option value="katja">Katja</option>
       <option value="mark">Mark</option>
       <option value="jus">Jus</option>
     </select>
+
+    <label for="loginPassword" class="font-semibold">Enter Password:</label>
+    <input type="password" id="loginPassword" required placeholder="Enter password" class="p-2 border rounded" />
+
+    <button type="submit" class="bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Login</button>
+  </form>
+  <p id="loginMsg" class="text-red-600 mt-3 text-center"></p>
+</div>
+
+<div id="gamePage" class="max-w-4xl mx-auto hidden">
+  <div class="flex justify-between items-center mb-4">
+    <h1 class="text-2xl font-bold">Premier League Prediction Game</h1>
+    <button id="logoutBtn" class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">Logout</button>
   </div>
 
   <!-- Gameweek Navigation -->
@@ -88,11 +100,19 @@
 document.addEventListener("DOMContentLoaded", () => {
   const players = ["david", "katja", "mark", "jus"];
   const totalGameWeeks = 38;
-  let currentPlayer = null;
-  let currentWeek = null;
 
-  // Elements
-  const playerSelect = document.getElementById("playerSelect");
+  // Login page elements
+  const loginPage = document.getElementById("loginPage");
+  const loginForm = document.getElementById("loginForm");
+  const loginPlayer = document.getElementById("loginPlayer");
+  const loginPassword = document.getElementById("loginPassword");
+  const loginMsg = document.getElementById("loginMsg");
+
+  // Game page elements
+  const gamePage = document.getElementById("gamePage");
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  // Elements from previous code inside gamePage
   const gwSelect = document.getElementById("gameWeek");
   const fixturesContainer = document.getElementById("fixtures");
   const fixturesSection = document.getElementById("fixturesSection");
@@ -112,7 +132,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const importDataBtn = document.getElementById("importDataBtn");
   const importDataInput = document.getElementById("importDataInput");
 
-  // Populate gameweek selector
+  let currentPlayer = null;
+  let currentWeek = null;
+
+  // Initialize gameweek dropdown
   for (let i = 1; i <= totalGameWeeks; i++) {
     const opt = document.createElement("option");
     opt.value = i;
@@ -120,11 +143,12 @@ document.addEventListener("DOMContentLoaded", () => {
     gwSelect.appendChild(opt);
   }
 
-  // Helpers
+  // Helper to capitalize player names
   function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
   }
 
+  // LocalStorage helpers
   function getFixtures(gw) {
     return JSON.parse(localStorage.getItem(`gw_${gw}_fixtures`) || "[]");
   }
@@ -153,6 +177,14 @@ document.addEventListener("DOMContentLoaded", () => {
     localStorage.setItem(`gw_${gw}_deadline`, dateStr);
   }
 
+  // Password storage (simple, NOT secure, demo only)
+  function getPassword(player) {
+    return localStorage.getItem(`pw_${player}`) || null;
+  }
+  function savePassword(player, pw) {
+    localStorage.setItem(`pw_${player}`, pw);
+  }
+
   // Show/hide controls based on player
   function updateControlsVisibility() {
     if(currentPlayer === "david") {
@@ -168,20 +200,18 @@ document.addEventListener("DOMContentLoaded", () => {
       deadlineInput.classList.add("hidden");
       saveDeadlineBtn.classList.add("hidden");
       dataBackupDiv.classList.add("hidden");
-      fixturesSection.classList.add("hidden"); // Hide fixtures section for non-David
+      fixturesSection.classList.add("hidden");
     }
   }
 
-  // Render deadline (input for David, display for others)
   function renderDeadline() {
     const dl = getDeadline(currentWeek);
     deadlineDisplay.textContent = dl ? new Date(dl).toLocaleDateString() : "No deadline set";
     deadlineInput.value = dl;
   }
 
-  // Render fixtures with delete button (David only)
   function renderFixtures() {
-    if(currentPlayer !== "david") return; // Only David sees this section
+    if(currentPlayer !== "david") return;
     const fixtures = getFixtures(currentWeek);
     fixturesContainer.innerHTML = "";
     fixtures.forEach((f,i) => {
@@ -198,9 +228,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Render predictions with input boxes or labels and delete buttons for each fixture
-  // Includes fixture names inline for all players
-  // Shows other players' predictions only for fixtures current player predicted
   function renderPredictions() {
     const fixtures = getFixtures(currentWeek);
     const results = getResults(currentWeek);
@@ -220,8 +247,6 @@ document.addEventListener("DOMContentLoaded", () => {
     fixtures.forEach((f, i) => {
       const resultEntered = results[i] !== undefined;
       const pred = playerPreds[i] || { home: "", away: "" };
-
-      // Does current player have prediction for this fixture?
       const playerPredExists = (pred.home !== "" && pred.home !== undefined) && (pred.away !== "" && pred.away !== undefined);
 
       const div = document.createElement("div");
@@ -231,7 +256,6 @@ document.addEventListener("DOMContentLoaded", () => {
       predRow.className = "flex gap-2 items-center";
 
       if(resultEntered) {
-        // Result exists => show prediction values, no inputs, no delete for prediction
         predRow.innerHTML = `
           <span class="w-32">${f.home}</span>
           <span class="font-bold">${pred.home !== "" ? pred.home : "-"}</span>
@@ -240,7 +264,6 @@ document.addEventListener("DOMContentLoaded", () => {
           <span class="w-32">${f.away}</span>
         `;
       } else {
-        // No result => input allowed, show delete prediction button
         predRow.innerHTML = `
           <label class="w-32">${f.home}</label>
           <input type="number" min="0" class="w-12 text-center border p-1 rounded" id="pred_home_${i}" value="${pred.home !== "" ? pred.home : ""}" />
@@ -253,12 +276,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       div.appendChild(predRow);
 
-      // Show other players' predictions only if current player predicted this fixture
       if(playerPredExists) {
         const otherPlayersPredsDiv = document.createElement("div");
         otherPlayersPredsDiv.className = "ml-36 mt-1 text-sm text-gray-700 italic";
 
-        // Collect other players predictions for this fixture
         let othersPredsHTML = "<strong>Other players' predictions:</strong> ";
         let othersFound = false;
 
@@ -284,7 +305,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Render results inputs with delete buttons (David only)
   function renderResults() {
     const fixtures = getFixtures(currentWeek);
     const results = getResults(currentWeek);
@@ -313,7 +333,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Render points per fixture after results entered
   function renderPointsPerFixture() {
     pointsPerFixtureContainer.innerHTML = "";
     const fixtures = getFixtures(currentWeek);
@@ -323,7 +342,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Header row
     const header = document.createElement("div");
     header.className = "flex gap-4 font-bold border-b pb-1 mb-2";
     header.innerHTML = `<div class="w-48">Fixture</div>${players.map(p => `<div class="w-20 text-center">${capitalize(p)}</div>`).join("")}`;
@@ -354,7 +372,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Update leaderboard overall and weekly
   function updateLeaderboard() {
     const totalScores = {};
     players.forEach(p => totalScores[p] = 0);
@@ -369,23 +386,24 @@ document.addEventListener("DOMContentLoaded", () => {
       weeklyScores[gw] = {};
       players.forEach(p => weeklyScores[gw][p] = 0);
 
-      players.forEach(p => {
-        const preds = getPredictions(gw, p);
-        if(preds.length === 0) return;
-        preds.forEach((pred, i) => {
-          const actual = results[i];
-          if(!actual) return;
+      fixtures.forEach((f, i) => {
+        const actual = results[i];
+        if(!actual) return;
 
-          let score = 0;
-          if(pred.home === actual.home) score++;
-          if(pred.away === actual.away) score++;
+        players.forEach(p => {
+          const preds = getPredictions(gw, p);
+          const pred = preds[i];
+          if(!pred) return;
+
+          let points = 0;
+          if(pred.home === actual.home) points++;
+          if(pred.away === actual.away) points++;
           const predDiff = pred.home - pred.away;
           const actualDiff = actual.home - actual.away;
-          if((predDiff === 0 && actualDiff === 0) || (predDiff * actualDiff > 0)) score += 2;
-          if(pred.home === actual.home && pred.away === actual.away) score++;
-
-          totalScores[p] += score;
-          weeklyScores[gw][p] += score;
+          if ((predDiff === 0 && actualDiff === 0) || (predDiff * actualDiff > 0)) points += 2;
+          if(pred.home === actual.home && pred.away === actual.away) points++;
+          weeklyScores[gw][p] += points;
+          totalScores[p] += points;
         });
       });
     }
@@ -418,9 +436,8 @@ document.addEventListener("DOMContentLoaded", () => {
     leaderboardContainer.innerHTML = overallHtml;
   }
 
-  // Render all parts
   function renderAll() {
-    if(!currentWeek || !currentPlayer) {
+    if(!currentPlayer || !currentWeek) {
       predictionsContainer.textContent = "Please select a player and a game week.";
       fixturesContainer.innerHTML = "";
       resultsContainer.innerHTML = "";
@@ -440,11 +457,15 @@ document.addEventListener("DOMContentLoaded", () => {
     updateLeaderboard();
   }
 
-  // Event listeners
-
-  playerSelect.addEventListener("change", () => {
-    currentPlayer = playerSelect.value;
-    renderAll();
+  // Event listeners for game page
+  logoutBtn.addEventListener("click", () => {
+    currentPlayer = null;
+    currentWeek = null;
+    loginPlayer.value = "";
+    loginPassword.value = "";
+    loginMsg.textContent = "";
+    gamePage.classList.add("hidden");
+    loginPage.classList.remove("hidden");
   });
 
   gwSelect.addEventListener("change", () => {
@@ -453,6 +474,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   addFixtureBtn.addEventListener("click", () => {
+    if(currentPlayer !== "david") return;
     const fixtures = getFixtures(currentWeek);
     fixtures.push({home:"", away:""});
     saveFixtures(currentWeek, fixtures);
@@ -462,36 +484,36 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   fixturesContainer.addEventListener("click", e => {
-    if(!e.target.classList.contains("delete-fixture-btn")) return;
-    if(currentPlayer !== "david") return;
-    const idx = +e.target.dataset.index;
-    if(!confirm("Delete this fixture? This will also delete associated predictions and results.")) return;
+    if(e.target.classList.contains("delete-fixture-btn")) {
+      if(currentPlayer !== "david") return;
+      const idx = +e.target.dataset.index;
+      if(!confirm("Delete this fixture? This will also delete associated predictions and results.")) return;
 
-    const fixtures = getFixtures(currentWeek);
-    if(idx >= fixtures.length) return;
+      const fixtures = getFixtures(currentWeek);
+      if(idx >= fixtures.length) return;
 
-    fixtures.splice(idx,1);
-    saveFixtures(currentWeek, fixtures);
+      fixtures.splice(idx,1);
+      saveFixtures(currentWeek, fixtures);
 
-    // Remove associated predictions and results for that fixture index
-    players.forEach(p => {
-      let preds = getPredictions(currentWeek, p);
-      if(preds.length > idx) {
-        preds.splice(idx, 1);
-        savePredictions(currentWeek, p, preds);
+      players.forEach(p => {
+        let preds = getPredictions(currentWeek, p);
+        if(preds.length > idx) {
+          preds.splice(idx, 1);
+          savePredictions(currentWeek, p, preds);
+        }
+      });
+      let results = getResults(currentWeek);
+      if(results.length > idx) {
+        results.splice(idx,1);
+        saveResults(currentWeek, results);
       }
-    });
-    let results = getResults(currentWeek);
-    if(results.length > idx) {
-      results.splice(idx,1);
-      saveResults(currentWeek, results);
-    }
 
-    renderFixtures();
-    renderPredictions();
-    renderResults();
-    renderPointsPerFixture();
-    updateLeaderboard();
+      renderFixtures();
+      renderPredictions();
+      renderResults();
+      renderPointsPerFixture();
+      updateLeaderboard();
+    }
   });
 
   fixturesContainer.addEventListener("input", e => {
@@ -549,21 +571,22 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   predictionsContainer.addEventListener("click", e => {
-    if(!e.target.classList.contains("delete-pred-btn")) return;
-    if(!currentPlayer) return;
-    const idx = +e.target.dataset.index;
-    const results = getResults(currentWeek);
-    if(results[idx] !== undefined) {
-      alert("Cannot delete prediction after result has been submitted for this fixture.");
-      return;
+    if(e.target.classList.contains("delete-pred-btn")) {
+      if(!currentPlayer) return;
+      const idx = +e.target.dataset.index;
+      const results = getResults(currentWeek);
+      if(results[idx] !== undefined) {
+        alert("Cannot delete prediction after result has been submitted for this fixture.");
+        return;
+      }
+      let preds = getPredictions(currentWeek, currentPlayer);
+      if(preds.length <= idx) return;
+      preds.splice(idx, 1);
+      savePredictions(currentWeek, currentPlayer, preds);
+      renderPredictions();
+      updateLeaderboard();
+      renderPointsPerFixture();
     }
-    let preds = getPredictions(currentWeek, currentPlayer);
-    if(preds.length <= idx) return;
-    preds.splice(idx, 1);
-    savePredictions(currentWeek, currentPlayer, preds);
-    renderPredictions();
-    updateLeaderboard();
-    renderPointsPerFixture();
   });
 
   submitResultsBtn.addEventListener("click", () => {
@@ -603,17 +626,18 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   resultsContainer.addEventListener("click", e => {
-    if(!e.target.classList.contains("delete-result-btn")) return;
-    if(currentPlayer !== "david") return alert("Only David can delete results.");
-    const idx = +e.target.dataset.index;
-    let results = getResults(currentWeek);
-    if(results.length <= idx) return;
-    if(!confirm("Delete result for this fixture?")) return;
-    results.splice(idx, 1);
-    saveResults(currentWeek, results);
-    renderResults();
-    renderPointsPerFixture();
-    updateLeaderboard();
+    if(e.target.classList.contains("delete-result-btn")) {
+      if(currentPlayer !== "david") return alert("Only David can delete results.");
+      const idx = +e.target.dataset.index;
+      let results = getResults(currentWeek);
+      if(results.length <= idx) return;
+      if(!confirm("Delete result for this fixture?")) return;
+      results.splice(idx, 1);
+      saveResults(currentWeek, results);
+      renderResults();
+      renderPointsPerFixture();
+      updateLeaderboard();
+    }
   });
 
   saveDeadlineBtn.addEventListener("click", () => {
@@ -630,7 +654,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const data = {};
     for(let i=0; i<localStorage.length; i++) {
       const key = localStorage.key(i);
-      if(key.startsWith("gw_")) {
+      if(key.startsWith("gw_") || key.startsWith("pw_")) {
         data[key] = localStorage.getItem(key);
       }
     }
@@ -658,7 +682,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = JSON.parse(evt.target.result);
         for(let i=localStorage.length-1; i>=0; i--) {
           const key = localStorage.key(i);
-          if(key.startsWith("gw_")) {
+          if(key.startsWith("gw_") || key.startsWith("pw_")) {
             localStorage.removeItem(key);
           }
         }
@@ -673,11 +697,48 @@ document.addEventListener("DOMContentLoaded", () => {
     reader.readAsText(file);
   });
 
-  // Initialize selections and render
-  currentPlayer = playerSelect.value;
-  currentWeek = gwSelect.value;
-  updateControlsVisibility();
-  renderAll();
+  // Handle login form submit
+  loginForm.addEventListener("submit", e => {
+    e.preventDefault();
+    const player = loginPlayer.value;
+    const pwEntered = loginPassword.value.trim();
+
+    if(!players.includes(player)) {
+      loginMsg.textContent = "Invalid player selected.";
+      return;
+    }
+    if(!pwEntered) {
+      loginMsg.textContent = "Password cannot be empty.";
+      return;
+    }
+
+    const storedPw = getPassword(player);
+
+    if(storedPw === null) {
+      // No password yet, save it now
+      savePassword(player, pwEntered);
+      loginMsg.textContent = "";
+      loginSuccess(player);
+    } else {
+      // Check password
+      if(storedPw === pwEntered) {
+        loginMsg.textContent = "";
+        loginSuccess(player);
+      } else {
+        loginMsg.textContent = "Incorrect password.";
+      }
+    }
+  });
+
+  function loginSuccess(player) {
+    currentPlayer = player;
+    currentWeek = 1;
+    gwSelect.value = currentWeek;
+    loginPage.classList.add("hidden");
+    gamePage.classList.remove("hidden");
+    updateControlsVisibility();
+    renderAll();
+  }
 });
 </script>
 </body>
