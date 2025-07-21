@@ -96,7 +96,7 @@
           <input placeholder="Away" class="p-1 border rounded w-32" />
         `;
         fixturesContainer.appendChild(div);
-        // Do NOT saveAndReload() here to avoid wiping existing fixtures
+        // Don't save and reload immediately to prevent fixture overwrite
       });
 
       fixturesContainer.addEventListener("input", () => {
@@ -165,6 +165,15 @@
         alert("Results saved!");
       });
 
+      // Safe JSON parse helper - returns null if invalid JSON
+      function safeParseJSON(str) {
+        try {
+          return JSON.parse(str);
+        } catch {
+          return null;
+        }
+      }
+
       function getFixtureData(gw) {
         return JSON.parse(localStorage.getItem(`gw_${gw}_fixtures`) || "[]");
       }
@@ -194,6 +203,7 @@
       }
 
       function loadPredictions(gw) {
+        console.log(`Loading predictions for player: ${currentPlayer}, gameweek: ${gw}`);
         const fixtureData = getFixtureData(gw);
         predictionsContainer.innerHTML = "";
 
@@ -206,7 +216,16 @@
           return;
         }
 
-        const existing = JSON.parse(localStorage.getItem(`gw_${gw}_predictions_${currentPlayer}`) || "null");
+        let existingRaw = localStorage.getItem(`gw_${gw}_predictions_${currentPlayer}`);
+        let existing = safeParseJSON(existingRaw);
+
+        if (existingRaw && existing === null) {
+          // Data corrupted - clear it and inform user
+          console.warn(`Corrupted predictions data found for ${currentPlayer} at GW${gw}. Clearing corrupted data.`);
+          localStorage.removeItem(`gw_${gw}_predictions_${currentPlayer}`);
+          existing = null;
+          alert(`Corrupted saved predictions detected for you in Week ${gw}. Previous data has been cleared. Please enter new predictions.`);
+        }
 
         if (!existing) {
           fixtureData.forEach((f, i) => {
@@ -237,7 +256,8 @@
 
           players.forEach(player => {
             if (player === currentPlayer) return;
-            const preds = JSON.parse(localStorage.getItem(`gw_${gw}_predictions_${player}`) || "null");
+            const predsRaw = localStorage.getItem(`gw_${gw}_predictions_${player}`);
+            const preds = safeParseJSON(predsRaw);
             if (!preds) return;
             const label = document.createElement("h3");
             label.textContent = `${player.charAt(0).toUpperCase() + player.slice(1)}'s Predictions:`;
@@ -255,7 +275,8 @@
 
       function loadResults(gw) {
         const fixtureData = getFixtureData(gw);
-        const results = JSON.parse(localStorage.getItem(`gw_${gw}_results`) || "[]");
+        const resultsRaw = localStorage.getItem(`gw_${gw}_results`);
+        const results = safeParseJSON(resultsRaw) || [];
         resultsContainer.innerHTML = "";
         fixtureData.forEach((f, i) => {
           const row = document.createElement("div");
@@ -279,7 +300,8 @@
           const results = JSON.parse(localStorage.getItem(`gw_${gw}_results`) || "[]");
           if (!results.length) continue;
           players.forEach(player => {
-            const preds = JSON.parse(localStorage.getItem(`gw_${gw}_predictions_${player}`) || "null");
+            const predsRaw = localStorage.getItem(`gw_${gw}_predictions_${player}`);
+            const preds = safeParseJSON(predsRaw);
             if (!preds) return;
             preds.forEach((p, i) => {
               const actual = results[i];
