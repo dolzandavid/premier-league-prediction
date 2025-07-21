@@ -1,156 +1,117 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Premier League Prediction Game</title>
+  <meta charset="UTF-8" />
+  <title>PL Prediction (Minimal)</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
-    h1 { font-size: 24px; }
-    select, input, button { margin: 5px; }
-    table { border-collapse: collapse; margin-top: 15px; }
-    td, th { padding: 5px 10px; border: 1px solid #ccc; }
-    .readonly { background-color: #e0e0e0; }
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    input, select, button { margin: 5px; }
+    table { border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 5px 10px; border: 1px solid #ccc; }
   </style>
 </head>
 <body>
   <h1>Premier League Prediction Game</h1>
 
-  <label for="playerSelect">Select Player:</label>
-  <select id="playerSelect">
-    <option value="">--Choose--</option>
-    <option value="david">David</option>
-    <option value="katja">Katja</option>
-    <option value="mark">Mark</option>
-    <option value="jus">Jus</option>
-  </select>
+  <label>Player:
+    <select id="player">
+      <option value="">--Select--</option>
+      <option value="david">David</option>
+      <option value="katja">Katja</option>
+      <option value="mark">Mark</option>
+      <option value="jus">Jus</option>
+    </select>
+  </label>
 
-  <label for="gameWeek">Select Game Week:</label>
-  <select id="gameWeek">
-    <option value="">--Choose Week--</option>
-    ${[...Array(38)].map((_, i) => `<option value="${i+1}">Week ${i+1}</option>`).join('')}
-  </select>
+  <label>Game Week:
+    <select id="week">
+      <option value="">--Select--</option>
+      ${Array.from({length:38}, (_,i)=>`<option value="${i+1}">Week ${i+1}</option>`).join('')}
+    </select>
+  </label>
 
-  <div id="fixtureInput" style="margin-top:20px;">
-    <h2>Add Fixture</h2>
-    <input id="homeTeam" placeholder="Home Team">
-    <input id="awayTeam" placeholder="Away Team">
-    <button onclick="addFixture()">Add Fixture</button>
-    <button onclick="clearFixtures()">Clear All Fixtures</button>
+  <div id="fixturesSection">
+    <h2>Fixtures</h2>
+    <div id="fixturesList">None yet</div>
+    <input id="homeF" placeholder="Home team">
+    <input id="awayF" placeholder="Away team">
+    <button id="addFix">Add Fixture</button>
   </div>
 
-  <div id="fixtures"></div>
-  <div id="predictions"></div>
+  <div id="predSection">
+    <h2>Predictions</h2>
+    <div id="predContent">Select player, week, and add fixtures.</div>
+  </div>
 
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      let currentPlayer = null;
+    const playerEl = document.getElementById('player');
+    const weekEl = document.getElementById('week');
+    const fixturesList = document.getElementById('fixturesList');
+    const addFix = document.getElementById('addFix');
+    const homeF = document.getElementById('homeF');
+    const awayF = document.getElementById('awayF');
+    const predContent = document.getElementById('predContent');
 
-      document.getElementById('playerSelect').addEventListener('change', () => {
-        currentPlayer = document.getElementById('playerSelect').value;
-        loadPredictions();
-      });
+    playerEl.onchange = render;
+    weekEl.onchange = render;
 
-      document.getElementById('gameWeek').addEventListener('change', () => {
-        loadPredictions();
-      });
+    addFix.onclick = () => {
+      const w = weekEl.value;
+      if (!w) return alert('Select week first');
+      const fixtures = JSON.parse(localStorage.getItem(`gw_${w}_fixtures`)) || [];
+      fixtures.push({home: homeF.value.trim(), away: awayF.value.trim()});
+      localStorage.setItem(`gw_${w}_fixtures`, JSON.stringify(fixtures));
+      homeF.value = awayF.value = '';
+      render();
+    };
 
-      function addFixture() {
-        const week = document.getElementById('gameWeek').value;
-        if (!week) return alert("Select game week first.");
+    function render() {
+      const p = playerEl.value;
+      const w = weekEl.value;
+      predContent.innerHTML = '';
 
-        const home = document.getElementById('homeTeam').value.trim();
-        const away = document.getElementById('awayTeam').value.trim();
-        if (!home || !away) return alert("Enter both team names.");
-
-        const fixtures = JSON.parse(localStorage.getItem(`gw_${week}_fixtures`) || "[]");
-        fixtures.push({ home, away });
-        localStorage.setItem(`gw_${week}_fixtures`, JSON.stringify(fixtures));
-        document.getElementById('homeTeam').value = "";
-        document.getElementById('awayTeam').value = "";
-        loadPredictions();
+      if (!p || !w) {
+        predContent.textContent = 'Select player and week.';
+        fixturesList.textContent = 'None yet';
+        return;
       }
 
-      function clearFixtures() {
-        const week = document.getElementById('gameWeek').value;
-        if (!week) return alert("Select game week first.");
-        localStorage.removeItem(`gw_${week}_fixtures`);
-        loadPredictions();
+      const fixtures = JSON.parse(localStorage.getItem(`gw_${w}_fixtures`)) || [];
+      if (fixtures.length === 0) {
+        fixturesList.textContent = 'No fixtures added.';
+        return;
+      } else {
+        fixturesList.innerHTML = '<ul>' + fixtures.map(f=>`<li>${f.home} vs ${f.away}</li>`).join('') + '</ul>';
       }
 
-      function loadPredictions() {
-        const gw = document.getElementById('gameWeek').value;
-        currentPlayer = document.getElementById('playerSelect').value;
-        const fixtureDiv = document.getElementById('fixtures');
-        const predDiv = document.getElementById('predictions');
-
-        fixtureDiv.innerHTML = "";
-        predDiv.innerHTML = "";
-
-        if (!gw || !currentPlayer) return;
-
-        const fixtures = JSON.parse(localStorage.getItem(`gw_${gw}_fixtures`) || "[]");
-        if (fixtures.length === 0) {
-          fixtureDiv.innerHTML = "<p>No fixtures yet.</p>";
-          return;
-        }
-
-        fixtureDiv.innerHTML = "<h2>Fixtures</h2><ul>" + 
-          fixtures.map(f => `<li>${f.home} vs ${f.away}</li>`).join("") + "</ul>";
-
-        const existing = JSON.parse(localStorage.getItem(`gw_${gw}_predictions_${currentPlayer}`) || "null");
-
-        if (Array.isArray(existing) && existing.length > 0) {
-          predDiv.innerHTML = "<h2>Your Predictions (Read-only)</h2>" +
-            tableFromPredictions(existing);
-          showOthers(gw, currentPlayer);
-          return;
-        }
-
-        let html = "<h2>Enter Your Predictions</h2><table><tr><th>Fixture</th><th>Home Score</th><th>Away Score</th></tr>";
-        fixtures.forEach((f, i) => {
-          html += `<tr>
-            <td>${f.home} vs ${f.away}</td>
-            <td><input id="h_${i}" size="2"></td>
-            <td><input id="a_${i}" size="2"></td>
-          </tr>`;
+      const key = `gw_${w}_predictions_${p}`;
+      const existing = JSON.parse(localStorage.getItem(key));
+      if (existing && existing.length === fixtures.length) {
+        predContent.innerHTML = '<strong>Your predictions (view-only):</strong><br>' +
+          existing.map((ex,i)=>`${fixtures[i].home} ${ex.home}:${ex.away} ${fixtures[i].away}`).join('<br>');
+      } else {
+        predContent.innerHTML = '<strong>Enter predictions:</strong><br>';
+        fixtures.forEach((f,i)=>{
+          const h = document.createElement('input');
+          const a = document.createElement('input');
+          h.type = a.type = 'number';
+          h.placeholder = a.placeholder = 'score';
+          h.id = 'h'+i; a.id = 'a'+i;
+          predContent.append(f.home+' ', h, ' : ', a, ' '+f.away, document.createElement('br'));
         });
-        html += "</table><button onclick='submitPredictions()'>Submit</button>";
-        predDiv.innerHTML = html;
+        const btn = document.createElement('button');
+        btn.textContent = 'Submit';
+        btn.onclick = () => {
+          const preds = fixtures.map((_,i)=>({
+            home: parseInt(document.getElementById('h'+i).value)||0,
+            away: parseInt(document.getElementById('a'+i).value)||0
+          }));
+          localStorage.setItem(key, JSON.stringify(preds));
+          render();
+        };
+        predContent.appendChild(btn);
       }
-
-      function submitPredictions() {
-        const gw = document.getElementById('gameWeek').value;
-        const fixtures = JSON.parse(localStorage.getItem(`gw_${gw}_fixtures`) || "[]");
-        const preds = fixtures.map((f, i) => ({
-          home: f.home,
-          away: f.away,
-          homeScore: parseInt(document.getElementById(`h_${i}`).value),
-          awayScore: parseInt(document.getElementById(`a_${i}`).value)
-        }));
-        localStorage.setItem(`gw_${gw}_predictions_${currentPlayer}`, JSON.stringify(preds));
-        loadPredictions();
-      }
-
-      function showOthers(gw, self) {
-        const div = document.getElementById('predictions');
-        div.innerHTML += "<h3>Other Predictions</h3>";
-        ["david", "katja", "mark", "jus"].forEach(p => {
-          if (p === self) return;
-          const data = JSON.parse(localStorage.getItem(`gw_${gw}_predictions_${p}`) || "null");
-          if (data && data.length > 0) {
-            div.innerHTML += `<h4>${p.charAt(0).toUpperCase() + p.slice(1)}:</h4>` + tableFromPredictions(data);
-          }
-        });
-      }
-
-      function tableFromPredictions(preds) {
-        let t = "<table><tr><th>Fixture</th><th>Home</th><th>Away</th></tr>";
-        preds.forEach(p => {
-          t += `<tr><td>${p.home} vs ${p.away}</td><td>${p.homeScore}</td><td>${p.awayScore}</td></tr>`;
-        });
-        return t + "</table>";
-      }
-    });
+    }
   </script>
 </body>
 </html>
