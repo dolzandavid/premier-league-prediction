@@ -8,7 +8,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import {
-      getFirestore, doc, setDoc, getDoc
+      getFirestore, doc, getDoc, setDoc
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -23,53 +23,133 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    window.saveFixtures = async function(gw, fixtures) {
-      await setDoc(doc(db, "fixtures", `gw_${gw}`), { fixtures });
+    const players = ["david", "katja", "mark", "jus"];
+    let currentPlayer = null;
+    let currentGW = 1;
+
+    async function getData(path) {
+      const ref = doc(db, ...path);
+      const snap = await getDoc(ref);
+      return snap.exists() ? snap.data() : null;
     }
 
-    window.getFixtures = async function(gw) {
-      const snap = await getDoc(doc(db, "fixtures", `gw_${gw}`));
-      return snap.exists() ? snap.data().fixtures : [];
+    async function saveData(path, data) {
+      await setDoc(doc(db, ...path), data);
     }
 
-    window.renderFixtures = async function() {
-      const gw = document.getElementById("gameWeek").value;
-      const container = document.getElementById("fixturesContainer");
-      const fixtures = await getFixtures(gw);
-      container.innerHTML = fixtures.length === 0 ? "No fixtures." : fixtures.map(f => `<div>${f.home} vs ${f.away}</div>`).join("");
-    }
+    document.addEventListener("DOMContentLoaded", async () => {
+      const loginForm = document.getElementById("loginForm");
+      const gamePage = document.getElementById("gamePage");
+      const gameWeekSelect = document.getElementById("gameWeek");
+      const fixturesDiv = document.getElementById("fixtures");
+      const addFixtureBtn = document.getElementById("addFixture");
 
-    window.addFixture = async function() {
-      const gw = document.getElementById("gameWeek").value;
-      const home = prompt("Home team?");
-      const away = prompt("Away team?");
-      if (!home || !away) return;
-      const existing = await getFixtures(gw);
-      existing.push({ home, away });
-      await saveFixtures(gw, existing);
-      renderFixtures();
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-      const gwSelect = document.getElementById("gameWeek");
       for (let i = 1; i <= 38; i++) {
         const opt = document.createElement("option");
         opt.value = i;
-        opt.textContent = `Week ${i}`;
-        gwSelect.appendChild(opt);
+        opt.textContent = `GW ${i}`;
+        gameWeekSelect.appendChild(opt);
       }
-      gwSelect.addEventListener("change", renderFixtures);
-      document.getElementById("addFixtureBtn").addEventListener("click", addFixture);
+
+      loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const player = document.getElementById("loginPlayer").value.toLowerCase();
+        const pass = document.getElementById("loginPassword").value;
+        const saved = await getData(["passwords", player]);
+        if (!saved || saved.password === pass) {
+          if (!saved) await saveData(["passwords", player], { password: pass });
+          currentPlayer = player;
+          document.getElementById("loginPage").classList.add("hidden");
+          gamePage.classList.remove("hidden");
+          if (currentPlayer === "david") addFixtureBtn.classList.remove("hidden");
+          loadFixtures(currentGW);
+        } else {
+          alert("Incorrect password");
+        }
+      });
+
+      document.getElementById("logoutBtn").addEventListener("click", () => {
+        currentPlayer = null;
+        document.getElementById("loginPage").classList.remove("hidden");
+        gamePage.classList.add("hidden");
+      });
+
+      gameWeekSelect.addEventListener("change", () => {
+        currentGW = parseInt(gameWeekSelect.value);
+        loadFixtures(currentGW);
+      });
+
+      addFixtureBtn.addEventListener("click", async () => {
+        const fixtures = await getData(["fixtures", `gw_${currentGW}`]) || { fixtures: [] };
+        fixtures.fixtures.push({ home: "", away: "" });
+        await saveData(["fixtures", `gw_${currentGW}`], fixtures);
+        loadFixtures(currentGW);
+      });
+
+      async function loadFixtures(gw) {
+        const wrapper = document.getElementById("fixtures");
+        wrapper.innerHTML = "";
+        const data = await getData(["fixtures", `gw_${gw}`]);
+        if (!data || !data.fixtures.length) {
+          wrapper.textContent = "No fixtures added.";
+          return;
+        }
+        data.fixtures.forEach((fix, idx) => {
+          const div = document.createElement("div");
+          div.className = "flex gap-2 mb-2 items-center";
+          div.innerHTML = `
+            <input type="text" class="border p-1 w-32" value="${fix.home}" data-idx="${idx}" data-type="home" ${currentPlayer !== "david" ? "readonly" : ""} />
+            <span>vs</span>
+            <input type="text" class="border p-1 w-32" value="${fix.away}" data-idx="${idx}" data-type="away" ${currentPlayer !== "david" ? "readonly" : ""} />
+          `;
+          wrapper.appendChild(div);
+        });
+      }
+
+      fixturesDiv.addEventListener("input", async (e) => {
+        if (currentPlayer !== "david") return;
+        const idx = +e.target.dataset.idx;
+        const type = e.target.dataset.type;
+        const data = await getData(["fixtures", `gw_${currentGW}`]) || { fixtures: [] };
+        if (!data.fixtures[idx]) return;
+        data.fixtures[idx][type] = e.target.value;
+        await saveData(["fixtures", `gw_${currentGW}`], data);
+      });
     });
   </script>
 </head>
-<body class="bg-gray-100 p-6">
-  <div class="max-w-xl mx-auto bg-white shadow p-6 rounded">
-    <h1 class="text-2xl font-bold mb-4">Premier League Prediction Game</h1>
-    <label for="gameWeek" class="font-semibold">Select Gameweek:</label>
-    <select id="gameWeek" class="border p-2 rounded ml-2"></select>
-    <button id="addFixtureBtn" class="ml-4 bg-blue-600 text-white px-3 py-1 rounded">Add Fixture</button>
-    <div id="fixturesContainer" class="mt-4 text-lg text-gray-800"></div>
+<body class="bg-gray-100 text-gray-900 p-6">
+  <div id="loginPage" class="max-w-md mx-auto bg-white p-6 rounded shadow">
+    <h1 class="text-2xl mb-4 font-bold text-center">Login</h1>
+    <form id="loginForm" class="flex flex-col gap-4">
+      <select id="loginPlayer" required class="border p-2 rounded">
+        <option value="" disabled selected>Select Player</option>
+        <option value="david">David</option>
+        <option value="katja">Katja</option>
+        <option value="mark">Mark</option>
+        <option value="jus">Jus</option>
+      </select>
+      <input type="password" id="loginPassword" required placeholder="Password" class="border p-2 rounded" />
+      <button type="submit" class="bg-blue-600 text-white rounded p-2 hover:bg-blue-700">Login</button>
+    </form>
+  </div>
+
+  <div id="gamePage" class="hidden max-w-4xl mx-auto">
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-2xl font-bold">Premier League Prediction Game</h1>
+      <button id="logoutBtn" class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">Logout</button>
+    </div>
+
+    <div class="mb-4">
+      <label for="gameWeek" class="font-semibold">Select Gameweek:</label>
+      <select id="gameWeek" class="ml-2 p-1 border rounded"></select>
+    </div>
+
+    <div class="mb-4">
+      <h2 class="text-xl font-semibold mb-2">Fixtures</h2>
+      <button id="addFixture" class="mb-2 bg-blue-500 text-white px-2 py-1 rounded hidden">Add Fixture</button>
+      <div id="fixtures" class="space-y-2"></div>
+    </div>
   </div>
 </body>
 </html>
