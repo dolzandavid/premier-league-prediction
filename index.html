@@ -139,7 +139,7 @@
           fixtureEditor.classList.remove("hidden");
           passwordResetSection.classList.remove("hidden");
           populatePasswordResetDropdown();
-        }
+        
             // Auto-generate 38 gameweeks if none exist
           const allFixtures = await getDocs(collection(db, "fixtures"));
           if (allFixtures.empty) {
