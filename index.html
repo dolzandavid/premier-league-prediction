@@ -20,7 +20,6 @@
       appId: "1:286908896536:web:dabd76b4faaa72a98cfa6d"
     };
 
-
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
@@ -239,11 +238,16 @@
       };
 
       savePredictionsBtn.onclick = async () => {
-        const newPreds = fixtures.map((_, i) => ({
-          home: +$(`pred_home_${i}`).value,
-          away: +$(`pred_away_${i}`).value
-        }));
-        await db.saveData("predictions", `gw_${currentWeek}_${currentPlayer}`, { predictions: newPreds });
+        const newPreds = fixtures.map((_, i) => {
+          const home = +$(`pred_home_${i}`).value;
+          const away = +$(`pred_away_${i}`).value;
+          if (home === 0 && away === 0) return null; // Prevent 0:0 predictions
+          return { home, away };
+        }).filter(pred => pred !== null); // Remove null values
+
+        if (newPreds.length > 0) {
+          await db.saveData("predictions", `gw_${currentWeek}_${currentPlayer}`, { predictions: newPreds });
+        }
         renderGame();
       };
 
@@ -252,26 +256,25 @@
 
     async function renderLeaderboard() {
       const scores = {};
-      for (const p of players) scores[p] = 0;
+      players.forEach(player => scores[player] = 0);
+
       for (let gw = 1; gw <= 38; gw++) {
         const fix = (await db.getData("fixtures", `gw_${gw}`))?.fixtures || [];
         const res = (await db.getData("results", `gw_${gw}`))?.results || [];
-        if (!res.length) continue;
+        if (res.length === 0) continue;
 
-        for (const p of players) {
-          const pred = (await db.getData("predictions", `gw_${gw}_${p}`))?.predictions || [];
-          fix.forEach((f, i) => {
-            if (!pred[i] || !res[i]) return;
-            let pts = 0;
-            if (pred[i].home === res[i].home) pts++;
-            if (pred[i].away === res[i].away) pts++;
-            const pdiff = pred[i].home - pred[i].away;
-            const rdiff = res[i].home - res[i].away;
-            if ((pdiff === 0 && rdiff === 0) || (pdiff * rdiff > 0)) pts += 2;
-            if (pred[i].home === res[i].home && pred[i].away === res[i].away) pts++;
-            scores[p] += pts;
+        players.forEach(player => {
+          const preds = (await db.getData("predictions", `gw_${gw}_${player}`))?.predictions || [];
+          preds.forEach((prediction, i) => {
+            if (prediction) {
+              let points = 0;
+              if (prediction.home === res[i].home) points++;
+              if (prediction.away === res[i].away) points++;
+              if (prediction.home === res[i].home && prediction.away === res[i].away) points += 1;
+              scores[player] += points;
+            }
           });
-        }
+        });
       }
       leaderboardDisplay.innerHTML = `
         <table class="w-full border mt-2">
