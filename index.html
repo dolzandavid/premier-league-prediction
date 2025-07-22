@@ -2,14 +2,80 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Premier League Prediction Game</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Premier League Predictor</title>
+  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+  <div class="max-w-5xl mx-auto p-4">
+    <h1 class="text-2xl font-bold mb-4 text-center">Premier League Prediction Game</h1>
+    
+    <!-- Login Section -->
+    <div id="loginSection" class="mb-6">
+      <input id="username" class="border p-2 mr-2" placeholder="Username" />
+      <input id="password" type="password" class="border p-2 mr-2" placeholder="Password" />
+      <button id="loginBtn" class="bg-blue-500 text-white px-4 py-2">Login</button>
+    </div>
+
+    <div id="app" style="display:none;">
+      <div class="flex justify-between items-center mb-4">
+        <span id="welcomeUser" class="font-semibold"></span>
+        <button id="logoutBtn" class="bg-gray-400 text-white px-3 py-1 rounded">Logout</button>
+      </div>
+
+      <!-- Gameweek Picker and Deadline -->
+      <div class="mb-4">
+        <label for="gameweekSelect" class="mr-2 font-medium">Gameweek:</label>
+        <select id="gameweekSelect" class="border p-2"></select>
+        <span id="gameweekDeadline" class="ml-4 text-sm text-gray-600"></span>
+      </div>
+
+      <!-- Fixture Editor (David only) -->
+      <div id="fixtureEditor" class="mb-6 hidden">
+        <h2 class="text-lg font-semibold mb-2">Edit Fixtures</h2>
+        <input id="newHomeTeam" class="border p-2 mr-2" placeholder="Home Team" />
+        <input id="newAwayTeam" class="border p-2 mr-2" placeholder="Away Team" />
+        <button id="addFixtureBtn" class="bg-green-500 text-white px-3 py-1">Add Fixture</button>
+        <div class="mt-2">
+          <label class="text-sm">Deadline:</label>
+          <input type="datetime-local" id="deadlineInput" class="border p-1 ml-2" />
+          <button id="setDeadlineBtn" class="bg-blue-500 text-white px-2 py-1 ml-2 text-sm">Set Deadline</button>
+        </div>
+      </div>
+
+      <!-- Fixtures Display -->
+      <div id="fixturesContainer" class="mb-8"></div>
+
+      <!-- Leaderboard -->
+      <div class="mb-6">
+        <h2 class="text-lg font-semibold mb-2">Overall Leaderboard</h2>
+        <div id="leaderboardOverall" class="overflow-x-auto"></div>
+        <h2 class="text-lg font-semibold mt-6 mb-2">Weekly Leaderboard</h2>
+        <div id="leaderboardWeekly" class="overflow-x-auto"></div>
+      </div>
+
+      <!-- Password reset section (David only) -->
+      <div id="passwordResetSection" class="hidden mb-8">
+        <h2 class="text-lg font-semibold mb-2">Reset Player Password</h2>
+        <select id="resetUserSelect" class="border p-2 mr-2"></select>
+        <input id="newPasswordInput" class="border p-2 mr-2" placeholder="New Password" />
+        <button id="resetPasswordBtn" class="bg-red-500 text-white px-3 py-1">Reset Password</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import {
-      getFirestore, doc, setDoc, getDoc, updateDoc, collection, getDocs
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getFirestore, doc, setDoc, getDoc, updateDoc, deleteField, onSnapshot, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA2WG0LUwLCDqmylgezCZ0aH5Q8vTaXTKU",
@@ -20,267 +86,288 @@
       appId: "1:286908896536:web:dabd76b4faaa72a98cfa6d"
     };
 
-
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Simple helpers
-    async function saveData(coll, id, data) {
-      await setDoc(doc(db, coll, id), data);
-    }
-    async function updateData(coll, id, data) {
-      await updateDoc(doc(db, coll, id), data);
-    }
-    async function getData(coll, id) {
-      const snap = await getDoc(doc(db, coll, id));
-      return snap.exists() ? snap.data() : null;
-    }
-    async function getAllDocs(coll) {
-      const snap = await getDocs(collection(db, coll));
-      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const users = {
+      david: "david123",
+      katja: "katja123",
+      mark: "mark123",
+      jus: "jus123"
+    };
+
+    let currentUser = "";
+    let currentGameweek = "1";
+
+    // Helper: Escape HTML
+    const esc = str => str.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    // UI Elements
+    const loginSection = document.getElementById("loginSection");
+    const usernameInput = document.getElementById("username");
+    const passwordInput = document.getElementById("password");
+    const loginBtn = document.getElementById("loginBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const welcomeUser = document.getElementById("welcomeUser");
+    const appDiv = document.getElementById("app");
+    const gameweekSelect = document.getElementById("gameweekSelect");
+    const fixturesContainer = document.getElementById("fixturesContainer");
+    const leaderboardOverall = document.getElementById("leaderboardOverall");
+    const leaderboardWeekly = document.getElementById("leaderboardWeekly");
+    const fixtureEditor = document.getElementById("fixtureEditor");
+    const newHomeTeam = document.getElementById("newHomeTeam");
+    const newAwayTeam = document.getElementById("newAwayTeam");
+    const addFixtureBtn = document.getElementById("addFixtureBtn");
+    const deadlineInput = document.getElementById("deadlineInput");
+    const setDeadlineBtn = document.getElementById("setDeadlineBtn");
+    const gameweekDeadline = document.getElementById("gameweekDeadline");
+    const passwordResetSection = document.getElementById("passwordResetSection");
+    const resetUserSelect = document.getElementById("resetUserSelect");
+    const newPasswordInput = document.getElementById("newPasswordInput");
+    const resetPasswordBtn = document.getElementById("resetPasswordBtn");
+
+        loginBtn.onclick = async () => {
+      const user = usernameInput.value.trim().toLowerCase();
+      const pass = passwordInput.value;
+      const savedPass = (await getDoc(doc(db, "passwords", user))).data()?.password;
+      if (users[user] && (pass === users[user] || pass === savedPass)) {
+        currentUser = user;
+        loginSection.style.display = "none";
+        appDiv.style.display = "block";
+        welcomeUser.textContent = `Welcome, ${user}`;
+        if (user === "david") {
+          fixtureEditor.classList.remove("hidden");
+          passwordResetSection.classList.remove("hidden");
+          populatePasswordResetDropdown();
+        }
+        await loadGameweeks();
+      } else {
+        alert("Invalid login");
+      }
+    };
+
+    logoutBtn.onclick = () => location.reload();
+
+    async function loadGameweeks() {
+      const snapshot = await getDocs(collection(db, "fixtures"));
+      const weeks = [...new Set(snapshot.docs.map(d => d.id.split("_")[0]))].sort((a,b)=>+a-+b);
+      gameweekSelect.innerHTML = weeks.map(w => `<option value="${w}">Gameweek ${w}</option>`).join("");
+      currentGameweek = weeks[0];
+      gameweekSelect.value = currentGameweek;
+      loadGameweekData();
     }
 
-    window.db = {
-      saveData, getData, getAllDocs, updateData
+    gameweekSelect.onchange = () => {
+      currentGameweek = gameweekSelect.value;
+      loadGameweekData();
+    };
+
+    async function loadGameweekData() {
+      fixturesContainer.innerHTML = "";
+      gameweekDeadline.textContent = "";
+      const week = currentGameweek;
+      const fixtureDocs = await getDocs(collection(db, "fixtures"));
+      const fixtures = fixtureDocs.docs.filter(doc => doc.id.startsWith(week + "_")).map(doc => ({ id: doc.id, ...doc.data() }));
+      const resultSnap = await getDoc(doc(db, "results", week));
+      const results = resultSnap.exists() ? resultSnap.data() : {};
+      const predSnap = await getDoc(doc(db, "predictions", week));
+      const predictions = predSnap.exists() ? predSnap.data() : {};
+      const deadlineSnap = await getDoc(doc(db, "deadlines", week));
+      const deadline = deadlineSnap.exists() ? deadlineSnap.data().deadline : null;
+      if (deadline) gameweekDeadline.textContent = `Deadline: ${new Date(deadline).toLocaleString()}`;
+
+      fixtures.forEach((fixture, i) => {
+        const fixtureId = fixture.id;
+        const div = document.createElement("div");
+        div.className = "border p-2 my-2 bg-white rounded shadow";
+
+        const result = results[fixtureId];
+        const pred = predictions[fixtureId]?.[currentUser];
+        const isLocked = !!result;
+        const canEdit = !isLocked;
+
+        const home = esc(fixture.home);
+        const away = esc(fixture.away);
+        const predHome = pred?.home ?? "";
+        const predAway = pred?.away ?? "";
+        const resHome = result?.home ?? "";
+        const resAway = result?.away ?? "";
+
+        div.innerHTML = `
+          <div class="flex items-center justify-between">
+            <div class="font-medium">${home} vs ${away}</div>
+            ${currentUser === "david" ? `<button class="text-red-500 deleteFixture" data-id="${fixtureId}">Delete</button>` : ""}
+          </div>
+
+          <div class="mt-2 flex space-x-6">
+            <div>
+              <label class="text-sm block">Your Prediction:</label>
+              <input type="number" min="0" ${canEdit ? "" : "disabled"} class="border p-1 w-12 predHome" value="${predHome}">
+              :
+              <input type="number" min="0" ${canEdit ? "" : "disabled"} class="border p-1 w-12 predAway" value="${predAway}">
+              ${canEdit ? `<button class="savePred text-sm text-blue-600 ml-2" data-id="${fixtureId}">Save</button>` : ""}
+              ${pred ? `<button class="deletePred text-sm text-red-500 ml-2" data-id="${fixtureId}">Delete</button>` : ""}
+            </div>
+            <div>
+              <label class="text-sm block">Result:</label>
+              <input type="number" min="0" class="border p-1 w-12 resHome" value="${resHome}" ${currentUser === "david" ? "" : "disabled"}>
+              :
+              <input type="number" min="0" class="border p-1 w-12 resAway" value="${resAway}" ${currentUser === "david" ? "" : "disabled"}>
+              ${currentUser === "david" ? `<button class="saveRes text-sm text-green-600 ml-2" data-id="${fixtureId}">Save</button>
+              ${result ? `<button class="deleteRes text-sm text-red-500 ml-2" data-id="${fixtureId}">Delete</button>` : ""}` : ""}
+            </div>
+          </div>
+
+          <div class="text-sm mt-2 playersPred"></div>
+        `;
+        fixturesContainer.appendChild(div);
+
+        // Show all players' predictions once user submits theirs
+        const predDiv = div.querySelector(".playersPred");
+        if (result || pred) {
+          const allPreds = predictions[fixtureId] || {};
+          let lines = "";
+          for (let user in allPreds) {
+            const p = allPreds[user];
+            const pts = result ? calculatePoints(p, result) : "-";
+            lines += `${user}: ${p.home}:${p.away} (${pts} pts)<br>`;
+          }
+          predDiv.innerHTML = lines;
+        }
+
+        // Add event listeners
+        div.querySelectorAll(".savePred").forEach(btn => btn.onclick = () => savePrediction(fixtureId, div));
+        div.querySelectorAll(".saveRes").forEach(btn => btn.onclick = () => saveResult(fixtureId, div));
+        div.querySelectorAll(".deletePred").forEach(btn => btn.onclick = () => deletePrediction(fixtureId));
+        div.querySelectorAll(".deleteRes").forEach(btn => btn.onclick = () => deleteResult(fixtureId));
+        div.querySelectorAll(".deleteFixture").forEach(btn => btn.onclick = () => deleteFixture(fixtureId));
+      });
+
+      renderLeaderboards(predictions, results, fixtures);
+    }
+
+    function calculatePoints(pred, res) {
+      let points = 0;
+      if (pred.home == res.home) points++;
+      if (pred.away == res.away) points++;
+      const predOutcome = Math.sign(pred.home - pred.away);
+      const resOutcome = Math.sign(res.home - res.away);
+      if (predOutcome === resOutcome) points += 2;
+      if (pred.home == res.home && pred.away == res.away) points += 1;
+      return points;
+    }
+
+    function renderLeaderboards(predictions, results, fixtures) {
+      const scores = {};
+      const weekly = {};
+
+      for (let f of fixtures) {
+        const fid = f.id;
+        const res = results[fid];
+        if (!res) continue;
+        const preds = predictions[fid] || {};
+        for (let user in preds) {
+          const pts = calculatePoints(preds[user], res);
+          scores[user] = (scores[user] || 0) + pts;
+          weekly[user] = (weekly[user] || 0) + pts;
+        }
+      }
+
+      const render = (obj) =>
+        `<table class="table-auto border w-full text-sm">
+          <thead><tr><th class="border px-2">Player</th><th class="border px-2">Points</th></tr></thead>
+          <tbody>
+            ${Object.entries(obj).sort((a,b)=>b[1]-a[1]).map(([u,p]) =>
+              `<tr><td class="border px-2">${u}</td><td class="border px-2">${p}</td></tr>`).join("")}
+          </tbody></table>`;
+
+      leaderboardOverall.innerHTML = render(scores);
+      leaderboardWeekly.innerHTML = render(weekly);
+    }
+
+    async function savePrediction(fixtureId, div) {
+      const h = div.querySelector(".predHome").value;
+      const a = div.querySelector(".predAway").value;
+      const docRef = doc(db, "predictions", currentGameweek);
+      const snap = await getDoc(docRef);
+      const data = snap.exists() ? snap.data() : {};
+      if (!data[fixtureId]) data[fixtureId] = {};
+      data[fixtureId][currentUser] = { home: +h, away: +a };
+      await setDoc(docRef, data);
+      loadGameweekData();
+    }
+
+    async function saveResult(fixtureId, div) {
+      const h = div.querySelector(".resHome").value;
+      const a = div.querySelector(".resAway").value;
+      const docRef = doc(db, "results", currentGameweek);
+      const snap = await getDoc(docRef);
+      const data = snap.exists() ? snap.data() : {};
+      data[fixtureId] = { home: +h, away: +a };
+      await setDoc(docRef, data);
+      loadGameweekData();
+    }
+
+    async function deletePrediction(fixtureId) {
+      const docRef = doc(db, "predictions", currentGameweek);
+      const snap = await getDoc(docRef);
+      if (!snap.exists()) return;
+      const data = snap.data();
+      if (data[fixtureId]) {
+        delete data[fixtureId][currentUser];
+        if (Object.keys(data[fixtureId]).length === 0) delete data[fixtureId];
+      }
+      await setDoc(docRef, data);
+      loadGameweekData();
+    }
+
+    async function deleteResult(fixtureId) {
+      const docRef = doc(db, "results", currentGameweek);
+      const snap = await getDoc(docRef);
+      if (!snap.exists()) return;
+      const data = snap.data();
+      delete data[fixtureId];
+      await setDoc(docRef, data);
+      loadGameweekData();
+    }
+
+    async function deleteFixture(fixtureId) {
+      await deleteDoc(doc(db, "fixtures", fixtureId));
+      loadGameweekData();
+    }
+
+    addFixtureBtn.onclick = async () => {
+      const home = newHomeTeam.value.trim();
+      const away = newAwayTeam.value.trim();
+      if (!home || !away) return alert("Enter both teams");
+      const id = `${currentGameweek}_${home}_${away}_${Date.now()}`;
+      await setDoc(doc(db, "fixtures", id), { home, away });
+      newHomeTeam.value = newAwayTeam.value = "";
+      loadGameweekData();
+    };
+
+    setDeadlineBtn.onclick = async () => {
+      const deadline = deadlineInput.value;
+      if (!deadline) return;
+      await setDoc(doc(db, "deadlines", currentGameweek), { deadline });
+      loadGameweekData();
+    };
+
+    async function populatePasswordResetDropdown() {
+      resetUserSelect.innerHTML = Object.keys(users)
+        .map(u => `<option value="${u}">${u}</option>`).join("");
+    }
+
+    resetPasswordBtn.onclick = async () => {
+      const user = resetUserSelect.value;
+      const pass = newPasswordInput.value.trim();
+      if (!pass) return alert("Enter new password");
+      await setDoc(doc(db, "passwords", user), { password: pass });
+      newPasswordInput.value = "";
+      alert("Password updated");
     };
   </script>
-</head>
-<body class="bg-gray-100 text-gray-900 p-6">
-  <div id="app" class="max-w-3xl mx-auto bg-white p-4 shadow rounded">
-    <h1 class="text-2xl font-bold mb-4 text-center">Premier League Prediction Game</h1>
-    
-    <!-- Login -->
-    <div id="loginSection" class="mb-6">
-      <label class="block mb-2 font-semibold">Player:</label>
-      <select id="loginPlayer" class="w-full border p-2 mb-2 rounded">
-        <option value="" disabled selected>Select player</option>
-        <option value="david">David</option>
-        <option value="katja">Katja</option>
-        <option value="mark">Mark</option>
-        <option value="jus">Jus</option>
-      </select>
-      <input id="loginPassword" type="password" placeholder="Password" class="w-full border p-2 mb-2 rounded" />
-      <button id="loginBtn" class="w-full bg-blue-600 text-white py-2 rounded">Login</button>
-      <p id="loginMsg" class="text-center text-red-600 mt-2"></p>
-    </div>
 
-    <!-- Main App -->
-    <div id="mainSection" class="hidden">
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="text-xl font-semibold">Welcome, <span id="currentPlayer"></span></h2>
-        <button id="logoutBtn" class="bg-red-500 text-white px-3 py-1 rounded">Logout</button>
-      </div>
-
-      <div class="mb-4">
-        <label class="font-semibold">Gameweek:</label>
-        <select id="gameWeekSelect" class="border p-1 rounded ml-2"></select>
-      </div>
-
-      <div id="fixturesSection" class="mb-6 hidden">
-        <h3 class="font-semibold mb-2">Fixtures</h3>
-        <div id="fixturesList" class="space-y-2"></div>
-        <button id="addFixtureBtn" class="mt-2 bg-blue-500 text-white px-2 py-1 rounded">Add Fixture</button>
-      </div>
-
-      <div class="mb-6">
-        <h3 class="font-semibold mb-2">Your Predictions</h3>
-        <div id="predictionsList" class="space-y-2"></div>
-        <button id="savePredictionsBtn" class="mt-2 bg-green-500 text-white px-4 py-2 rounded">Save Predictions</button>
-      </div>
-
-      <div id="resultsSection" class="mb-6 hidden">
-        <h3 class="font-semibold mb-2">Actual Results</h3>
-        <div id="resultsList" class="space-y-2"></div>
-        <button id="saveResultsBtn" class="mt-2 bg-purple-500 text-white px-4 py-2 rounded">Save Results</button>
-      </div>
-
-      <div class="mb-6">
-        <h3 class="font-semibold mb-2">Leaderboard</h3>
-        <div id="leaderboardDisplay"></div>
-      </div>
-    </div>
-  </div>
-
-  <script type="module">
-    const players = ["david", "katja", "mark", "jus"];
-    const weeks = Array.from({length: 38}, (_, i) => i + 1);
-
-    let currentPlayer = null;
-    let currentWeek = 1;
-
-    const $ = id => document.getElementById(id);
-
-    // DOM Elements
-    const loginSection = $("loginSection");
-    const mainSection = $("mainSection");
-    const loginBtn = $("loginBtn");
-    const logoutBtn = $("logoutBtn");
-    const loginMsg = $("loginMsg");
-    const loginPlayer = $("loginPlayer");
-    const loginPassword = $("loginPassword");
-    const gameWeekSelect = $("gameWeekSelect");
-    const currentPlayerDisplay = $("currentPlayer");
-
-    const fixturesSection = $("fixturesSection");
-    const fixturesList = $("fixturesList");
-    const addFixtureBtn = $("addFixtureBtn");
-
-    const predictionsList = $("predictionsList");
-    const savePredictionsBtn = $("savePredictionsBtn");
-
-    const resultsSection = $("resultsSection");
-    const resultsList = $("resultsList");
-    const saveResultsBtn = $("saveResultsBtn");
-
-    const leaderboardDisplay = $("leaderboardDisplay");
-
-    // Init gameweek dropdown
-    weeks.forEach(w => {
-      const opt = document.createElement("option");
-      opt.value = w;
-      opt.textContent = `Week ${w}`;
-      gameWeekSelect.appendChild(opt);
-    });
-
-    gameWeekSelect.addEventListener("change", () => {
-      currentWeek = +gameWeekSelect.value;
-      renderGame();
-    });
-
-    loginBtn.addEventListener("click", async () => {
-      const player = loginPlayer.value;
-      const password = loginPassword.value.trim();
-      if (!player || !password) {
-        loginMsg.textContent = "Please select a player and enter password.";
-        return;
-      }
-      const saved = await db.getData("passwords", player);
-      if (!saved) {
-        await db.saveData("passwords", player, { password });
-      } else if (saved.password !== password) {
-        loginMsg.textContent = "Incorrect password.";
-        return;
-      }
-      currentPlayer = player;
-      loginSection.classList.add("hidden");
-      mainSection.classList.remove("hidden");
-      currentPlayerDisplay.textContent = player;
-      renderGame();
-    });
-
-    logoutBtn.addEventListener("click", () => location.reload());
-
-    async function renderGame() {
-      gameWeekSelect.value = currentWeek;
-      const fixtures = (await db.getData("fixtures", `gw_${currentWeek}`))?.fixtures || [];
-      const results = (await db.getData("results", `gw_${currentWeek}`))?.results || [];
-      const preds = (await db.getData("predictions", `gw_${currentWeek}_${currentPlayer}`))?.predictions || [];
-
-      fixturesSection.classList.toggle("hidden", currentPlayer !== "david");
-      resultsSection.classList.toggle("hidden", currentPlayer !== "david");
-
-      fixturesList.innerHTML = "";
-      resultsList.innerHTML = "";
-      predictionsList.innerHTML = "";
-
-      fixtures.forEach((f, i) => {
-        // Fixtures
-        if (currentPlayer === "david") {
-          fixturesList.innerHTML += `
-            <div class="flex gap-2">
-              <input class="border p-1 w-1/2" value="${f.home}" data-fixture="${i}" data-side="home">
-              <input class="border p-1 w-1/2" value="${f.away}" data-fixture="${i}" data-side="away">
-            </div>`;
-        } else {
-          fixturesList.innerHTML += `<div>${f.home} vs ${f.away}</div>`;
-        }
-
-        // Results
-        resultsList.innerHTML += `
-          <div class="flex gap-2">
-            <input class="border p-1 w-12" value="${results[i]?.home ?? ""}" id="res_home_${i}">
-            <span>:</span>
-            <input class="border p-1 w-12" value="${results[i]?.away ?? ""}" id="res_away_${i}">
-            <span>${f.home} vs ${f.away}</span>
-          </div>`;
-
-        // Predictions
-        predictionsList.innerHTML += `
-          <div class="flex gap-2">
-            <input class="border p-1 w-12" value="${preds[i]?.home ?? ""}" id="pred_home_${i}">
-            <span>:</span>
-            <input class="border p-1 w-12" value="${preds[i]?.away ?? ""}" id="pred_away_${i}">
-            <span>${f.home} vs ${f.away}</span>
-          </div>`;
-      });
-
-      addFixtureBtn.onclick = async () => {
-        fixtures.push({ home: "", away: "" });
-        await db.saveData("fixtures", `gw_${currentWeek}`, { fixtures });
-        renderGame();
-      };
-
-      fixturesList.querySelectorAll("input").forEach(input => {
-        input.addEventListener("input", async e => {
-          const i = +e.target.dataset.fixture;
-          const side = e.target.dataset.side;
-          fixtures[i][side] = e.target.value;
-          await db.saveData("fixtures", `gw_${currentWeek}`, { fixtures });
-        });
-      });
-
-      saveResultsBtn.onclick = async () => {
-        const newResults = fixtures.map((_, i) => ({
-          home: +$(`res_home_${i}`).value,
-          away: +$(`res_away_${i}`).value
-        }));
-        await db.saveData("results", `gw_${currentWeek}`, { results: newResults });
-        renderGame();
-      };
-
-      savePredictionsBtn.onclick = async () => {
-        const newPreds = fixtures.map((_, i) => ({
-          home: +$(`pred_home_${i}`).value,
-          away: +$(`pred_away_${i}`).value
-        }));
-        await db.saveData("predictions", `gw_${currentWeek}_${currentPlayer}`, { predictions: newPreds });
-        renderGame();
-      };
-
-      renderLeaderboard();
-    }
-
-    async function renderLeaderboard() {
-      const scores = {};
-      for (const p of players) scores[p] = 0;
-      for (let gw = 1; gw <= 38; gw++) {
-        const fix = (await db.getData("fixtures", `gw_${gw}`))?.fixtures || [];
-        const res = (await db.getData("results", `gw_${gw}`))?.results || [];
-        if (!res.length) continue;
-
-        for (const p of players) {
-          const pred = (await db.getData("predictions", `gw_${gw}_${p}`))?.predictions || [];
-          fix.forEach((f, i) => {
-            if (!pred[i] || !res[i]) return;
-            let pts = 0;
-            if (pred[i].home === res[i].home) pts++;
-            if (pred[i].away === res[i].away) pts++;
-            const pdiff = pred[i].home - pred[i].away;
-            const rdiff = res[i].home - res[i].away;
-            if ((pdiff === 0 && rdiff === 0) || (pdiff * rdiff > 0)) pts += 2;
-            if (pred[i].home === res[i].home && pred[i].away === res[i].away) pts++;
-            scores[p] += pts;
-          });
-        }
-      }
-      leaderboardDisplay.innerHTML = `
-        <table class="w-full border mt-2">
-          <thead><tr><th class="border p-1">Player</th><th class="border p-1">Points</th></tr></thead>
-          <tbody>
-            ${players.map(p => `<tr><td class="border p-1">${p}</td><td class="border p-1 text-center">${scores[p]}</td></tr>`).join("")}
-          </tbody>
-        </table>`;
-    }
   </script>
 </body>
 </html>
