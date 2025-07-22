@@ -860,6 +860,24 @@ document.addEventListener("DOMContentLoaded", () => {
     renderAll();
   }
 });
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+   const firebaseConfig = {
+    apiKey: "AIzaSyA2WG0LUwLCDqmylgezCZ0aH5Q8vTaXTKU",
+    authDomain: "pl-predictor-13a6d.firebaseapp.com",
+    projectId: "pl-predictor-13a6d",
+    storageBucket: "pl-predictor-13a6d.firebasestorage.app",
+    messagingSenderId: "286908896536",
+    appId: "1:286908896536:web:dabd76b4faaa72a98cfa6d"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  window.firebaseDB = db; // make accessible to your other JS  
 </script>
 
 </body>
