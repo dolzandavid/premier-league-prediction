@@ -149,21 +149,29 @@
     loginBtn.addEventListener("click", async () => {
       const player = loginPlayer.value;
       const password = loginPassword.value.trim();
+      
       if (!player || !password) {
         loginMsg.textContent = "Please select a player and enter password.";
         return;
       }
-      const saved = await db.getData("passwords", player);
+
+      const saved = await db.getData("passwords", player); // Get the stored password from Firestore for this player
+      
       if (!saved) {
+        loginMsg.textContent = "Player does not exist. A new password has been created.";
+        // If the player doesn't exist, create a new one with the entered password
         await db.saveData("passwords", player, { password });
       } else if (saved.password !== password) {
         loginMsg.textContent = "Incorrect password.";
         return;
       }
+
+      // If the password matches, proceed to the main section
       currentPlayer = player;
       loginSection.classList.add("hidden");
       mainSection.classList.remove("hidden");
       currentPlayerDisplay.textContent = player;
+
       renderGame();
     });
 
