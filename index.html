@@ -53,10 +53,10 @@
       <label class="block mb-2 font-semibold">Player:</label>
       <select id="loginPlayer" class="w-full border p-2 mb-2 rounded">
         <option value="" disabled selected>Select player</option>
-        <option value="david">David</option>
-        <option value="katja">Katja</option>
-        <option value="mark">Mark</option>
-        <option value="jus">Jus</option>
+        <option value="David">David</option>
+        <option value="Katja">Katja</option>
+        <option value="Mark">Mark</option>
+        <option value="Jus">Jus</option>
       </select>
       <input id="loginPassword" type="password" placeholder="Password" class="w-full border p-2 mb-2 rounded" />
       <button id="loginBtn" class="w-full bg-blue-600 text-white py-2 rounded">Login</button>
@@ -101,7 +101,7 @@
   </div>
 
   <script type="module">
-    const players = ["david", "katja", "mark", "jus"];
+    const players = ["David", "Katja", "Mark", "Jus"];
     const weeks = Array.from({length: 38}, (_, i) => i + 1);
 
     let currentPlayer = null;
@@ -147,41 +147,43 @@
     });
 
     loginBtn.addEventListener("click", async () => {
-      const player = loginPlayer.value;
-      const password = loginPassword.value.trim();
+      let player = loginPlayer.value;  // Get the player name from the dropdown
+      const password = loginPassword.value.trim();   // Get the entered password
 
-        // Debugging line to check what player and password are entered
-  console.log("Player: ", player);
-  console.log("Password: ", password);
-      
+      // Normalize the player name to lowercase (matching Firestore document names)
+      player = player.toLowerCase();
+
+      console.log("Normalized Player: ", player);  // Debugging line
+      console.log("Password: ", password);  // Debugging line
+
       if (!player || !password) {
         loginMsg.textContent = "Please select a player and enter password.";
+        console.log("Player or password is empty");  // Debugging line
         return;
       }
 
-      const saved = await db.getData("passwords", player); // Get the stored password from Firestore for this player
+      // Fetch the saved password for the player from Firestore
+      const saved = await db.getData("passwords", player);
 
-       // Debugging line to check the saved player data from Firestore
-  console.log("Saved Player Data: ", saved);
-      
+      console.log("Saved Player Data: ", saved);  // Debugging line
+
       if (!saved) {
         loginMsg.textContent = "Player does not exist. A new password has been created.";
-        // If the player doesn't exist, create a new one with the entered password
+        console.log("Player does not exist. Creating new player.");  // Debugging line
         await db.saveData("passwords", player, { password });
       } else if (saved.password !== password) {
         loginMsg.textContent = "Incorrect password.";
-        console.log("Incorrect password entered"); // Debugging line
+        console.log("Incorrect password entered");  // Debugging line
         return;
       }
 
-      // If the password matches, proceed to the main section
+      // If login is successful, proceed to the main section
       currentPlayer = player;
-      // Debugging line for successful login
-  console.log("Login successful for player:", player);
       loginSection.classList.add("hidden");
       mainSection.classList.remove("hidden");
       currentPlayerDisplay.textContent = player;
 
+      console.log("Login successful for player:", player);  // Debugging line
       renderGame();
     });
 
