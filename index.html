@@ -8,7 +8,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import {
-      getFirestore, doc, setDoc, getDoc, updateDoc, collection, getDocs
+      getFirestore, doc, setDoc, getDoc
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -23,201 +23,53 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Firebase wrapper functions
-    async function saveDoc(collectionName, docId, data) {
-      await setDoc(doc(db, collectionName, docId), data);
+    window.saveFixtures = async function(gw, fixtures) {
+      await setDoc(doc(db, "fixtures", `gw_${gw}`), { fixtures });
     }
 
-    async function getDocData(collectionName, docId) {
-      const docRef = doc(db, collectionName, docId);
-      const snap = await getDoc(docRef);
-      return snap.exists() ? snap.data() : null;
+    window.getFixtures = async function(gw) {
+      const snap = await getDoc(doc(db, "fixtures", `gw_${gw}`));
+      return snap.exists() ? snap.data().fixtures : [];
     }
 
-    async function updateDocData(collectionName, docId, data) {
-      await updateDoc(doc(db, collectionName, docId), data);
+    window.renderFixtures = async function() {
+      const gw = document.getElementById("gameWeek").value;
+      const container = document.getElementById("fixturesContainer");
+      const fixtures = await getFixtures(gw);
+      container.innerHTML = fixtures.length === 0 ? "No fixtures." : fixtures.map(f => `<div>${f.home} vs ${f.away}</div>`).join("");
     }
 
-    async function getAllDocs(collectionName) {
-      const querySnap = await getDocs(collection(db, collectionName));
-      return querySnap.docs.map(doc => ({ id: doc.id, data: doc.data() }));
+    window.addFixture = async function() {
+      const gw = document.getElementById("gameWeek").value;
+      const home = prompt("Home team?");
+      const away = prompt("Away team?");
+      if (!home || !away) return;
+      const existing = await getFixtures(gw);
+      existing.push({ home, away });
+      await saveFixtures(gw, existing);
+      renderFixtures();
     }
 
-    // Attach globally so game logic can use it
-    window.firebaseGame = {
-      saveDoc,
-      getDocData,
-      updateDocData,
-      getAllDocs
-    };
+    document.addEventListener("DOMContentLoaded", () => {
+      const gwSelect = document.getElementById("gameWeek");
+      for (let i = 1; i <= 38; i++) {
+        const opt = document.createElement("option");
+        opt.value = i;
+        opt.textContent = `Week ${i}`;
+        gwSelect.appendChild(opt);
+      }
+      gwSelect.addEventListener("change", renderFixtures);
+      document.getElementById("addFixtureBtn").addEventListener("click", addFixture);
+    });
   </script>
 </head>
-<body class="bg-gray-100 text-gray-900 p-4">
-  <div class="max-w-xl mx-auto bg-white shadow p-6 rounded" id="loginSection">
-    <h1 class="text-2xl font-bold text-center mb-4">Premier League Prediction Login</h1>
-    <select id="playerSelect" class="w-full border rounded p-2 mb-3">
-      <option value="">Select Player</option>
-      <option value="david">David</option>
-      <option value="katja">Katja</option>
-      <option value="mark">Mark</option>
-      <option value="jus">Jus</option>
-    </select>
-    <input id="passwordInput" type="password" placeholder="Password" class="w-full border rounded p-2 mb-3">
-    <button id="loginBtn" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Login</button>
-    <p id="loginMessage" class="text-red-500 mt-2 text-center"></p>
+<body class="bg-gray-100 p-6">
+  <div class="max-w-xl mx-auto bg-white shadow p-6 rounded">
+    <h1 class="text-2xl font-bold mb-4">Premier League Prediction Game</h1>
+    <label for="gameWeek" class="font-semibold">Select Gameweek:</label>
+    <select id="gameWeek" class="border p-2 rounded ml-2"></select>
+    <button id="addFixtureBtn" class="ml-4 bg-blue-600 text-white px-3 py-1 rounded">Add Fixture</button>
+    <div id="fixturesContainer" class="mt-4 text-lg text-gray-800"></div>
   </div>
-
-  <div class="max-w-4xl mx-auto hidden" id="mainApp">
-    <div class="flex justify-between items-center mb-4">
-      <h2 class="text-xl font-semibold">Welcome, <span id="playerName"></span></h2>
-      <button id="logoutBtn" class="bg-red-500 text-white px-4 py-2 rounded">Logout</button>
-    </div>
-
-    <div class="mb-4">
-      <label for="gwSelect" class="font-semibold">Select Gameweek:</label>
-      <select id="gwSelect" class="ml-2 p-1 border rounded">
-        ${[...Array(38)].map((_, i) => `<option value="${i+1}">GW ${i+1}</option>`).join("")}
-      </select>
-    </div>
-
-    <div class="mb-4">
-      <h3 class="font-semibold text-lg mb-2">Fixtures</h3>
-      <div id="fixturesList" class="mb-2"></div>
-      <button id="addFixtureBtn" class="bg-blue-500 text-white px-3 py-1 rounded hidden">Add Fixture</button>
-    </div>
-
-    <div class="mb-4">
-      <h3 class="font-semibold text-lg mb-2">Your Predictions</h3>
-      <div id="predictionsList"></div>
-      <button id="savePredictionsBtn" class="bg-green-500 text-white px-4 py-2 rounded mt-2">Save Predictions</button>
-    </div>
-
-    <div class="mb-4">
-      <h3 class="font-semibold text-lg mb-2">Results</h3>
-      <div id="resultsList"></div>
-      <button id="saveResultsBtn" class="bg-purple-600 text-white px-4 py-2 rounded mt-2 hidden">Save Results</button>
-    </div>
-
-    <div id="statusMessage" class="text-green-600 font-semibold mt-4"></div>
-  </div>
-
-  <script>
-    const players = ["david", "katja", "mark", "jus"];
-    let currentPlayer = null;
-
-    const $ = id => document.getElementById(id);
-
-    $("loginBtn").onclick = async () => {
-      const player = $("playerSelect").value;
-      const password = $("passwordInput").value;
-      if (!player || !password) {
-        $("loginMessage").textContent = "Please select a player and enter a password.";
-        return;
-      }
-      const data = await firebaseGame.getDocData("passwords", player);
-      if (!data) {
-        await firebaseGame.saveDoc("passwords", player, { password });
-        loginSuccess(player);
-      } else if (data.password === password) {
-        loginSuccess(player);
-      } else {
-        $("loginMessage").textContent = "Incorrect password.";
-      }
-    };
-
-    function loginSuccess(player) {
-      currentPlayer = player;
-      $("loginSection").classList.add("hidden");
-      $("mainApp").classList.remove("hidden");
-      $("playerName").textContent = player.charAt(0).toUpperCase() + player.slice(1);
-      if (player === "david") $("addFixtureBtn").classList.remove("hidden");
-      if (player === "david") $("saveResultsBtn").classList.remove("hidden");
-      loadGameWeek();
-    }
-
-    $("logoutBtn").onclick = () => {
-      currentPlayer = null;
-      $("mainApp").classList.add("hidden");
-      $("loginSection").classList.remove("hidden");
-    };
-
-    $("gwSelect").onchange = loadGameWeek;
-    $("addFixtureBtn").onclick = async () => {
-      const gw = $("gwSelect").value;
-      const fixtures = await firebaseGame.getDocData("fixtures", `gw_${gw}`) || { fixtures: [] };
-      fixtures.fixtures.push({ home: "", away: "" });
-      await firebaseGame.saveDoc("fixtures", `gw_${gw}`, fixtures);
-      loadGameWeek();
-    };
-
-    $("savePredictionsBtn").onclick = async () => {
-      const gw = $("gwSelect").value;
-      const preds = [];
-      document.querySelectorAll(".pred-input").forEach(input => {
-        const idx = +input.dataset.index;
-        const type = input.dataset.type;
-        if (!preds[idx]) preds[idx] = { home: "", away: "" };
-        preds[idx][type] = input.value;
-      });
-      await firebaseGame.saveDoc("predictions", `gw_${gw}_${currentPlayer}`, { predictions: preds });
-      $("statusMessage").textContent = "Predictions saved!";
-    };
-
-    $("saveResultsBtn").onclick = async () => {
-      const gw = $("gwSelect").value;
-      const results = [];
-      document.querySelectorAll(".res-input").forEach(input => {
-        const idx = +input.dataset.index;
-        const type = input.dataset.type;
-        if (!results[idx]) results[idx] = { home: "", away: "" };
-        results[idx][type] = input.value;
-      });
-      await firebaseGame.saveDoc("results", `gw_${gw}`, { results });
-      $("statusMessage").textContent = "Results saved!";
-    };
-
-    async function loadGameWeek() {
-      const gw = $("gwSelect").value;
-      const fix = await firebaseGame.getDocData("fixtures", `gw_${gw}`) || { fixtures: [] };
-      const preds = await firebaseGame.getDocData("predictions", `gw_${gw}_${currentPlayer}`) || { predictions: [] };
-      const results = await firebaseGame.getDocData("results", `gw_${gw}`) || { results: [] };
-
-      $("fixturesList").innerHTML = fix.fixtures.map((f, i) => `
-        <div class="flex items-center gap-2 mb-1">
-          <input class="border p-1 rounded" value="${f.home}" onchange="updateFixture(${i}, 'home', this.value)">
-          <span>vs</span>
-          <input class="border p-1 rounded" value="${f.away}" onchange="updateFixture(${i}, 'away', this.value)">
-        </div>
-      `).join("");
-
-      $("predictionsList").innerHTML = fix.fixtures.map((f, i) => `
-        <div class="flex items-center gap-2 mb-1">
-          <label class="w-28">${f.home}</label>
-          <input class="border p-1 w-12 text-center rounded pred-input" data-index="${i}" data-type="home" value="${preds.predictions[i]?.home || ''}">
-          <span>:</span>
-          <input class="border p-1 w-12 text-center rounded pred-input" data-index="${i}" data-type="away" value="${preds.predictions[i]?.away || ''}">
-          <label class="w-28">${f.away}</label>
-        </div>
-      `).join("");
-
-      $("resultsList").innerHTML = fix.fixtures.map((f, i) => `
-        <div class="flex items-center gap-2 mb-1">
-          <label class="w-28">${f.home}</label>
-          <input class="border p-1 w-12 text-center rounded res-input" data-index="${i}" data-type="home" value="${results.results[i]?.home || ''}">
-          <span>:</span>
-          <input class="border p-1 w-12 text-center rounded res-input" data-index="${i}" data-type="away" value="${results.results[i]?.away || ''}">
-          <label class="w-28">${f.away}</label>
-        </div>
-      `).join("");
-    }
-
-    async function updateFixture(i, type, value) {
-      const gw = $("gwSelect").value;
-      const data = await firebaseGame.getDocData("fixtures", `gw_${gw}`) || { fixtures: [] };
-      if (!data.fixtures[i]) data.fixtures[i] = { home: "", away: "" };
-      data.fixtures[i][type] = value;
-      await firebaseGame.saveDoc("fixtures", `gw_${gw}`, data);
-    }
-  </script>
 </body>
 </html>
