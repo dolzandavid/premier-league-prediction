@@ -8,7 +8,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import {
-      getFirestore, doc, getDoc, setDoc
+      getFirestore, doc, setDoc, getDoc, updateDoc, collection, getDocs
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -20,136 +20,267 @@
       appId: "1:286908896536:web:dabd76b4faaa72a98cfa6d"
     };
 
+
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    const players = ["david", "katja", "mark", "jus"];
-    let currentPlayer = null;
-    let currentGW = 1;
-
-    async function getData(path) {
-      const ref = doc(db, ...path);
-      const snap = await getDoc(ref);
+    // Simple helpers
+    async function saveData(coll, id, data) {
+      await setDoc(doc(db, coll, id), data);
+    }
+    async function updateData(coll, id, data) {
+      await updateDoc(doc(db, coll, id), data);
+    }
+    async function getData(coll, id) {
+      const snap = await getDoc(doc(db, coll, id));
       return snap.exists() ? snap.data() : null;
     }
-
-    async function saveData(path, data) {
-      await setDoc(doc(db, ...path), data);
+    async function getAllDocs(coll) {
+      const snap = await getDocs(collection(db, coll));
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
 
-    document.addEventListener("DOMContentLoaded", async () => {
-      const loginForm = document.getElementById("loginForm");
-      const gamePage = document.getElementById("gamePage");
-      const gameWeekSelect = document.getElementById("gameWeek");
-      const fixturesDiv = document.getElementById("fixtures");
-      const addFixtureBtn = document.getElementById("addFixture");
-
-      for (let i = 1; i <= 38; i++) {
-        const opt = document.createElement("option");
-        opt.value = i;
-        opt.textContent = `GW ${i}`;
-        gameWeekSelect.appendChild(opt);
-      }
-
-      loginForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const player = document.getElementById("loginPlayer").value.toLowerCase();
-        const pass = document.getElementById("loginPassword").value;
-        const saved = await getData(["passwords", player]);
-        if (!saved || saved.password === pass) {
-          if (!saved) await saveData(["passwords", player], { password: pass });
-          currentPlayer = player;
-          document.getElementById("loginPage").classList.add("hidden");
-          gamePage.classList.remove("hidden");
-          if (currentPlayer === "david") addFixtureBtn.classList.remove("hidden");
-          loadFixtures(currentGW);
-        } else {
-          alert("Incorrect password");
-        }
-      });
-
-      document.getElementById("logoutBtn").addEventListener("click", () => {
-        currentPlayer = null;
-        document.getElementById("loginPage").classList.remove("hidden");
-        gamePage.classList.add("hidden");
-      });
-
-      gameWeekSelect.addEventListener("change", () => {
-        currentGW = parseInt(gameWeekSelect.value);
-        loadFixtures(currentGW);
-      });
-
-      addFixtureBtn.addEventListener("click", async () => {
-        const fixtures = await getData(["fixtures", `gw_${currentGW}`]) || { fixtures: [] };
-        fixtures.fixtures.push({ home: "", away: "" });
-        await saveData(["fixtures", `gw_${currentGW}`], fixtures);
-        loadFixtures(currentGW);
-      });
-
-      async function loadFixtures(gw) {
-        const wrapper = document.getElementById("fixtures");
-        wrapper.innerHTML = "";
-        const data = await getData(["fixtures", `gw_${gw}`]);
-        if (!data || !data.fixtures.length) {
-          wrapper.textContent = "No fixtures added.";
-          return;
-        }
-        data.fixtures.forEach((fix, idx) => {
-          const div = document.createElement("div");
-          div.className = "flex gap-2 mb-2 items-center";
-          div.innerHTML = `
-            <input type="text" class="border p-1 w-32" value="${fix.home}" data-idx="${idx}" data-type="home" ${currentPlayer !== "david" ? "readonly" : ""} />
-            <span>vs</span>
-            <input type="text" class="border p-1 w-32" value="${fix.away}" data-idx="${idx}" data-type="away" ${currentPlayer !== "david" ? "readonly" : ""} />
-          `;
-          wrapper.appendChild(div);
-        });
-      }
-
-      fixturesDiv.addEventListener("input", async (e) => {
-        if (currentPlayer !== "david") return;
-        const idx = +e.target.dataset.idx;
-        const type = e.target.dataset.type;
-        const data = await getData(["fixtures", `gw_${currentGW}`]) || { fixtures: [] };
-        if (!data.fixtures[idx]) return;
-        data.fixtures[idx][type] = e.target.value;
-        await saveData(["fixtures", `gw_${currentGW}`], data);
-      });
-    });
+    window.db = {
+      saveData, getData, getAllDocs, updateData
+    };
   </script>
 </head>
 <body class="bg-gray-100 text-gray-900 p-6">
-  <div id="loginPage" class="max-w-md mx-auto bg-white p-6 rounded shadow">
-    <h1 class="text-2xl mb-4 font-bold text-center">Login</h1>
-    <form id="loginForm" class="flex flex-col gap-4">
-      <select id="loginPlayer" required class="border p-2 rounded">
-        <option value="" disabled selected>Select Player</option>
+  <div id="app" class="max-w-3xl mx-auto bg-white p-4 shadow rounded">
+    <h1 class="text-2xl font-bold mb-4 text-center">Premier League Prediction Game</h1>
+    
+    <!-- Login -->
+    <div id="loginSection" class="mb-6">
+      <label class="block mb-2 font-semibold">Player:</label>
+      <select id="loginPlayer" class="w-full border p-2 mb-2 rounded">
+        <option value="" disabled selected>Select player</option>
         <option value="david">David</option>
         <option value="katja">Katja</option>
         <option value="mark">Mark</option>
         <option value="jus">Jus</option>
       </select>
-      <input type="password" id="loginPassword" required placeholder="Password" class="border p-2 rounded" />
-      <button type="submit" class="bg-blue-600 text-white rounded p-2 hover:bg-blue-700">Login</button>
-    </form>
+      <input id="loginPassword" type="password" placeholder="Password" class="w-full border p-2 mb-2 rounded" />
+      <button id="loginBtn" class="w-full bg-blue-600 text-white py-2 rounded">Login</button>
+      <p id="loginMsg" class="text-center text-red-600 mt-2"></p>
+    </div>
+
+    <!-- Main App -->
+    <div id="mainSection" class="hidden">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold">Welcome, <span id="currentPlayer"></span></h2>
+        <button id="logoutBtn" class="bg-red-500 text-white px-3 py-1 rounded">Logout</button>
+      </div>
+
+      <div class="mb-4">
+        <label class="font-semibold">Gameweek:</label>
+        <select id="gameWeekSelect" class="border p-1 rounded ml-2"></select>
+      </div>
+
+      <div id="fixturesSection" class="mb-6 hidden">
+        <h3 class="font-semibold mb-2">Fixtures</h3>
+        <div id="fixturesList" class="space-y-2"></div>
+        <button id="addFixtureBtn" class="mt-2 bg-blue-500 text-white px-2 py-1 rounded">Add Fixture</button>
+      </div>
+
+      <div class="mb-6">
+        <h3 class="font-semibold mb-2">Your Predictions</h3>
+        <div id="predictionsList" class="space-y-2"></div>
+        <button id="savePredictionsBtn" class="mt-2 bg-green-500 text-white px-4 py-2 rounded">Save Predictions</button>
+      </div>
+
+      <div id="resultsSection" class="mb-6 hidden">
+        <h3 class="font-semibold mb-2">Actual Results</h3>
+        <div id="resultsList" class="space-y-2"></div>
+        <button id="saveResultsBtn" class="mt-2 bg-purple-500 text-white px-4 py-2 rounded">Save Results</button>
+      </div>
+
+      <div class="mb-6">
+        <h3 class="font-semibold mb-2">Leaderboard</h3>
+        <div id="leaderboardDisplay"></div>
+      </div>
+    </div>
   </div>
 
-  <div id="gamePage" class="hidden max-w-4xl mx-auto">
-    <div class="flex justify-between items-center mb-4">
-      <h1 class="text-2xl font-bold">Premier League Prediction Game</h1>
-      <button id="logoutBtn" class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">Logout</button>
-    </div>
+  <script type="module">
+    const players = ["david", "katja", "mark", "jus"];
+    const weeks = Array.from({length: 38}, (_, i) => i + 1);
 
-    <div class="mb-4">
-      <label for="gameWeek" class="font-semibold">Select Gameweek:</label>
-      <select id="gameWeek" class="ml-2 p-1 border rounded"></select>
-    </div>
+    let currentPlayer = null;
+    let currentWeek = 1;
 
-    <div class="mb-4">
-      <h2 class="text-xl font-semibold mb-2">Fixtures</h2>
-      <button id="addFixture" class="mb-2 bg-blue-500 text-white px-2 py-1 rounded hidden">Add Fixture</button>
-      <div id="fixtures" class="space-y-2"></div>
-    </div>
-  </div>
+    const $ = id => document.getElementById(id);
+
+    // DOM Elements
+    const loginSection = $("loginSection");
+    const mainSection = $("mainSection");
+    const loginBtn = $("loginBtn");
+    const logoutBtn = $("logoutBtn");
+    const loginMsg = $("loginMsg");
+    const loginPlayer = $("loginPlayer");
+    const loginPassword = $("loginPassword");
+    const gameWeekSelect = $("gameWeekSelect");
+    const currentPlayerDisplay = $("currentPlayer");
+
+    const fixturesSection = $("fixturesSection");
+    const fixturesList = $("fixturesList");
+    const addFixtureBtn = $("addFixtureBtn");
+
+    const predictionsList = $("predictionsList");
+    const savePredictionsBtn = $("savePredictionsBtn");
+
+    const resultsSection = $("resultsSection");
+    const resultsList = $("resultsList");
+    const saveResultsBtn = $("saveResultsBtn");
+
+    const leaderboardDisplay = $("leaderboardDisplay");
+
+    // Init gameweek dropdown
+    weeks.forEach(w => {
+      const opt = document.createElement("option");
+      opt.value = w;
+      opt.textContent = `Week ${w}`;
+      gameWeekSelect.appendChild(opt);
+    });
+
+    gameWeekSelect.addEventListener("change", () => {
+      currentWeek = +gameWeekSelect.value;
+      renderGame();
+    });
+
+    loginBtn.addEventListener("click", async () => {
+      const player = loginPlayer.value;
+      const password = loginPassword.value.trim();
+      if (!player || !password) {
+        loginMsg.textContent = "Please select a player and enter password.";
+        return;
+      }
+      const saved = await db.getData("passwords", player);
+      if (!saved) {
+        await db.saveData("passwords", player, { password });
+      } else if (saved.password !== password) {
+        loginMsg.textContent = "Incorrect password.";
+        return;
+      }
+      currentPlayer = player;
+      loginSection.classList.add("hidden");
+      mainSection.classList.remove("hidden");
+      currentPlayerDisplay.textContent = player;
+      renderGame();
+    });
+
+    logoutBtn.addEventListener("click", () => location.reload());
+
+    async function renderGame() {
+      gameWeekSelect.value = currentWeek;
+      const fixtures = (await db.getData("fixtures", `gw_${currentWeek}`))?.fixtures || [];
+      const results = (await db.getData("results", `gw_${currentWeek}`))?.results || [];
+      const preds = (await db.getData("predictions", `gw_${currentWeek}_${currentPlayer}`))?.predictions || [];
+
+      fixturesSection.classList.toggle("hidden", currentPlayer !== "david");
+      resultsSection.classList.toggle("hidden", currentPlayer !== "david");
+
+      fixturesList.innerHTML = "";
+      resultsList.innerHTML = "";
+      predictionsList.innerHTML = "";
+
+      fixtures.forEach((f, i) => {
+        // Fixtures
+        if (currentPlayer === "david") {
+          fixturesList.innerHTML += `
+            <div class="flex gap-2">
+              <input class="border p-1 w-1/2" value="${f.home}" data-fixture="${i}" data-side="home">
+              <input class="border p-1 w-1/2" value="${f.away}" data-fixture="${i}" data-side="away">
+            </div>`;
+        } else {
+          fixturesList.innerHTML += `<div>${f.home} vs ${f.away}</div>`;
+        }
+
+        // Results
+        resultsList.innerHTML += `
+          <div class="flex gap-2">
+            <input class="border p-1 w-12" value="${results[i]?.home ?? ""}" id="res_home_${i}">
+            <span>:</span>
+            <input class="border p-1 w-12" value="${results[i]?.away ?? ""}" id="res_away_${i}">
+            <span>${f.home} vs ${f.away}</span>
+          </div>`;
+
+        // Predictions
+        predictionsList.innerHTML += `
+          <div class="flex gap-2">
+            <input class="border p-1 w-12" value="${preds[i]?.home ?? ""}" id="pred_home_${i}">
+            <span>:</span>
+            <input class="border p-1 w-12" value="${preds[i]?.away ?? ""}" id="pred_away_${i}">
+            <span>${f.home} vs ${f.away}</span>
+          </div>`;
+      });
+
+      addFixtureBtn.onclick = async () => {
+        fixtures.push({ home: "", away: "" });
+        await db.saveData("fixtures", `gw_${currentWeek}`, { fixtures });
+        renderGame();
+      };
+
+      fixturesList.querySelectorAll("input").forEach(input => {
+        input.addEventListener("input", async e => {
+          const i = +e.target.dataset.fixture;
+          const side = e.target.dataset.side;
+          fixtures[i][side] = e.target.value;
+          await db.saveData("fixtures", `gw_${currentWeek}`, { fixtures });
+        });
+      });
+
+      saveResultsBtn.onclick = async () => {
+        const newResults = fixtures.map((_, i) => ({
+          home: +$(`res_home_${i}`).value,
+          away: +$(`res_away_${i}`).value
+        }));
+        await db.saveData("results", `gw_${currentWeek}`, { results: newResults });
+        renderGame();
+      };
+
+      savePredictionsBtn.onclick = async () => {
+        const newPreds = fixtures.map((_, i) => ({
+          home: +$(`pred_home_${i}`).value,
+          away: +$(`pred_away_${i}`).value
+        }));
+        await db.saveData("predictions", `gw_${currentWeek}_${currentPlayer}`, { predictions: newPreds });
+        renderGame();
+      };
+
+      renderLeaderboard();
+    }
+
+    async function renderLeaderboard() {
+      const scores = {};
+      for (const p of players) scores[p] = 0;
+      for (let gw = 1; gw <= 38; gw++) {
+        const fix = (await db.getData("fixtures", `gw_${gw}`))?.fixtures || [];
+        const res = (await db.getData("results", `gw_${gw}`))?.results || [];
+        if (!res.length) continue;
+
+        for (const p of players) {
+          const pred = (await db.getData("predictions", `gw_${gw}_${p}`))?.predictions || [];
+          fix.forEach((f, i) => {
+            if (!pred[i] || !res[i]) return;
+            let pts = 0;
+            if (pred[i].home === res[i].home) pts++;
+            if (pred[i].away === res[i].away) pts++;
+            const pdiff = pred[i].home - pred[i].away;
+            const rdiff = res[i].home - res[i].away;
+            if ((pdiff === 0 && rdiff === 0) || (pdiff * rdiff > 0)) pts += 2;
+            if (pred[i].home === res[i].home && pred[i].away === res[i].away) pts++;
+            scores[p] += pts;
+          });
+        }
+      }
+      leaderboardDisplay.innerHTML = `
+        <table class="w-full border mt-2">
+          <thead><tr><th class="border p-1">Player</th><th class="border p-1">Points</th></tr></thead>
+          <tbody>
+            ${players.map(p => `<tr><td class="border p-1">${p}</td><td class="border p-1 text-center">${scores[p]}</td></tr>`).join("")}
+          </tbody>
+        </table>`;
+    }
+  </script>
 </body>
 </html>
