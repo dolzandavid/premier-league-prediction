@@ -140,6 +140,16 @@
           passwordResetSection.classList.remove("hidden");
           populatePasswordResetDropdown();
         }
+            // Auto-generate 38 gameweeks if none exist
+          const allFixtures = await getDocs(collection(db, "fixtures"));
+          if (allFixtures.empty) {
+            for (let gw = 1; gw <= 38; gw++) {
+              const id = `${gw}_Team A_Team B_${Date.now() + gw}`;
+              await setDoc(doc(db, "fixtures", id), { home: "Team A", away: "Team B" });
+            }
+            alert("Auto-generated 38 gameweeks with placeholder fixtures.");
+          }
+        }
         await loadGameweeks();
       } else {
         alert("Invalid login");
