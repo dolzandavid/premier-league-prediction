@@ -149,6 +149,10 @@
     loginBtn.addEventListener("click", async () => {
       const player = loginPlayer.value;
       const password = loginPassword.value.trim();
+
+        // Debugging line to check what player and password are entered
+  console.log("Player: ", player);
+  console.log("Password: ", password);
       
       if (!player || !password) {
         loginMsg.textContent = "Please select a player and enter password.";
@@ -156,6 +160,9 @@
       }
 
       const saved = await db.getData("passwords", player); // Get the stored password from Firestore for this player
+
+       // Debugging line to check the saved player data from Firestore
+  console.log("Saved Player Data: ", saved);
       
       if (!saved) {
         loginMsg.textContent = "Player does not exist. A new password has been created.";
@@ -163,11 +170,14 @@
         await db.saveData("passwords", player, { password });
       } else if (saved.password !== password) {
         loginMsg.textContent = "Incorrect password.";
+        console.log("Incorrect password entered"); // Debugging line
         return;
       }
 
       // If the password matches, proceed to the main section
       currentPlayer = player;
+      // Debugging line for successful login
+  console.log("Login successful for player:", player);
       loginSection.classList.add("hidden");
       mainSection.classList.remove("hidden");
       currentPlayerDisplay.textContent = player;
