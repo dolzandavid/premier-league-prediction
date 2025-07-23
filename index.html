@@ -4,8 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Premier League Predictor</title>
-  <script type="module" src="="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script type="module" src="="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <style>
     input[type="number"]::-webkit-inner-spin-button,
@@ -21,7 +22,7 @@
     <!-- LOGIN SECTION -->
     <div id="loginSection" class="mb-6">
       <select id="username" class="border p-2 mr-2">
-        <option value="" disabled selected>Select player</option>
+        <option value="" disabled selected>Select user</option>
         <option value="david">David</option>
         <option value="katja">Katja</option>
         <option value="mark">Mark</option>
@@ -29,7 +30,6 @@
       </select>
       <input id="password" type="password" class="border p-2 mr-2" placeholder="Password" />
       <button id="loginBtn" class="bg-blue-500 text-white px-4 py-2">Login</button>
-      <button id="changePasswordBtn" class="text-sm text-blue-600 underline ml-4">Change password</button>
     </div>
 
     <!-- APP UI -->
@@ -79,250 +79,340 @@
         <button id="resetPasswordBtn" class="bg-red-500 text-white px-3 py-1">Reset Password</button>
       </div>
     </div> <!-- end #app -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, doc, setDoc, getDoc, getDocs, deleteDoc, collection } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  </div> <!-- end .container -->
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyA2WG0LUwLCDqmylgezCZ0aH5Q8vTaXTKU",
-      authDomain: "pl-predictor-13a6d.firebaseapp.com",
-      projectId: "pl-predictor-13a6d",
-      storageBucket: "pl-predictor-13a6d.appspot.com",
-      messagingSenderId: "286908896536",
-      appId: "1:286908896536:web:dabd76b4faaa72a98cfa6d"
-    };
+  <script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, doc, setDoc, getDoc, updateDoc, deleteField, onSnapshot, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+const firebaseConfig = {
+  apiKey: "AIzaSyA2WG0LUwLCDqmylgezCZ0aH5Q8vTaXTKU",
+  authDomain: "pl-predictor-13a6d.firebaseapp.com",
+  projectId: "pl-predictor-13a6d",
+  storageBucket: "pl-predictor-13a6d.appspot.com",
+  messagingSenderId: "286908896536",
+  appId: "1:286908896536:web:dabd76b4faaa72a98cfa6d"
+};
 
-  const users = ["david", "katja", "mark", "jus"];
-  let currentUser = "";
-  let currentGameweek = "";
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-  const capitalize = name => name.charAt(0).toUpperCase() + name.slice(1);
+const users = {
+  david: "david123",
+  katja: "katja123",
+  mark: "mark123",
+  jus: "jus123"
+};
 
-  document.getElementById("loginBtn").onclick = async () => {
-    const user = document.getElementById("username").value;
-    const pass = document.getElementById("password").value;
-    const passSnap = await getDoc(doc(db, "passwords", user));
-    if (!passSnap.exists() || passSnap.data().password !== pass) {
-      alert("Invalid password");
-      return;
-    }
+let currentUser = "";
+let currentGameweek = "";
+let deadlinesByWeek = {};
 
+const loginBtn = document.getElementById("loginBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+const appDiv = document.getElementById("app");
+const loginSection = document.getElementById("loginSection");
+const welcomeUser = document.getElementById("welcomeUser");
+
+loginBtn.onclick = async () => {
+  const user = document.getElementById("username").value;
+  const pass = document.getElementById("password").value;
+  const savedPass = (await getDoc(doc(db, "passwords", user))).data()?.password;
+  if (users[user] && (pass === users[user] || pass === savedPass)) {
     currentUser = user;
-    document.getElementById("loginSection").style.display = "none";
-    document.getElementById("app").style.display = "block";
-    document.getElementById("welcomeUser").textContent = `Welcome, ${capitalize(user)}`;
-
+    loginSection.style.display = "none";
+    appDiv.style.display = "block";
+    welcomeUser.textContent = `Welcome, ${user.charAt(0).toUpperCase() + user.slice(1)}`;
     if (user === "david") {
       document.getElementById("fixtureEditor").classList.remove("hidden");
       document.getElementById("passwordResetSection").classList.remove("hidden");
-      document.getElementById("resetUserSelect").innerHTML = users.map(u =>
-        `<option value="${u}">${capitalize(u)}</option>`).join("");
+      populatePasswordResetDropdown();
+
+      const allFixtures = await getDocs(collection(db, "fixtures"));
+      if (allFixtures.empty) {
+        for (let gw = 1; gw <= 38; gw++) {
+          const id = `${gw}_Team A_Team B_${Date.now() + gw}`;
+          await setDoc(doc(db, "fixtures", id), { home: "Team A", away: "Team B" });
+        }
+        alert("Auto-generated 38 gameweeks with placeholder fixtures.");
+      }
     }
+    await loadGameweeks(); // includes automatic closest deadline selection
+  } else {
+    alert("Invalid login");
+  }
+};
 
-    await autoSelectGameweek();
-    await loadGameweekData();
-  };
+logoutBtn.onclick = () => location.reload();
+async function loadGameweeks() {
+  const fixtureDocs = await getDocs(collection(db, "fixtures"));
+  const deadlineDocs = await getDocs(collection(db, "deadlines"));
 
-  async function autoSelectGameweek() {
-    const snapshot = await getDocs(collection(db, "deadlines"));
-    const now = new Date();
-    let closest = null;
-    let minDiff = Infinity;
-    snapshot.forEach(doc => {
-      const d = new Date(doc.data().deadline);
-      const diff = Math.abs(d - now);
+  const weeks = [...new Set(fixtureDocs.docs.map(d => d.id.split("_")[0]))]
+    .filter(Boolean)
+    .sort((a, b) => +a - +b);
+
+  deadlinesByWeek = {};
+  deadlineDocs.forEach(docSnap => {
+    const data = docSnap.data();
+    if (data?.deadline) {
+      deadlinesByWeek[docSnap.id] = new Date(data.deadline);
+    }
+  });
+
+  // Find gameweek with closest future deadline
+  const now = new Date();
+  let closestWeek = null;
+  let minDiff = Infinity;
+  for (let week of weeks) {
+    const deadline = deadlinesByWeek[week];
+    if (deadline) {
+      const diff = Math.abs(deadline - now);
       if (diff < minDiff) {
         minDiff = diff;
-        closest = doc.id;
+        closestWeek = week;
+      }
+    }
+  }
+
+  currentGameweek = closestWeek || weeks[0] || "1";
+
+  document.getElementById("gameweekSelect").innerHTML = weeks
+    .map(w => `<option value="${w}">Gameweek ${w}</option>`)
+    .join("");
+  document.getElementById("gameweekSelect").value = currentGameweek;
+  loadGameweekData();
+}
+
+document.getElementById("gameweekSelect").onchange = (e) => {
+  currentGameweek = e.target.value;
+  loadGameweekData();
+};
+
+async function loadGameweekData() {
+  const fixturesContainer = document.getElementById("fixturesContainer");
+  fixturesContainer.innerHTML = "";
+
+  const fixtureDocs = await getDocs(collection(db, "fixtures"));
+  const resultsDoc = await getDoc(doc(db, "results", currentGameweek));
+  const predictionsDoc = await getDoc(doc(db, "predictions", currentGameweek));
+  const deadlineDoc = await getDoc(doc(db, "deadlines", currentGameweek));
+
+  const fixtures = fixtureDocs.docs.filter(d => d.id.startsWith(currentGameweek + "_")).map(d => ({ id: d.id, ...d.data() }));
+  const results = resultsDoc.exists() ? resultsDoc.data() : {};
+  const predictions = predictionsDoc.exists() ? predictionsDoc.data() : {};
+  const deadline = deadlineDoc.exists() ? deadlineDoc.data()?.deadline : null;
+
+  document.getElementById("gameweekDeadline").textContent = deadline ? `Deadline: ${new Date(deadline).toLocaleString()}` : "";
+
+  fixtures.forEach(fixture => {
+    const div = document.createElement("div");
+    div.className = "border p-3 my-2 bg-white rounded shadow";
+
+    const result = results[fixture.id];
+    const pred = predictions[fixture.id]?.[currentUser];
+    const isLocked = !!result;
+
+    const home = fixture.home;
+    const away = fixture.away;
+    const predHome = pred?.home ?? "";
+    const predAway = pred?.away ?? "";
+    const resHome = result?.home ?? "";
+    const resAway = result?.away ?? "";
+
+    div.innerHTML = `
+      <div class="flex justify-between items-center">
+        <div class="font-semibold">
+          <span class="homeTeam">${home}</span> vs <span class="awayTeam">${away}</span>
+        </div>
+        ${currentUser === "david" ? `
+          <div>
+            <button class="text-blue-600 text-sm editBtn">✏️ Edit</button>
+            <button class="text-red-500 text-sm deleteFixtureBtn">🗑️</button>
+          </div>` : ""}
+      </div>
+
+      <div class="mt-2 flex space-x-4">
+        <div>
+          <label class="text-sm block">Your Prediction:</label>
+          <input type="number" min="0" class="border p-1 w-12 predHome" value="${predHome}" ${isLocked ? 'disabled' : ''}>
+          :
+          <input type="number" min="0" class="border p-1 w-12 predAway" value="${predAway}" ${isLocked ? 'disabled' : ''}>
+          ${!isLocked ? `<button class="savePred text-blue-600 text-sm ml-2">Save</button>` : ""}
+          ${!isLocked && pred ? `<button class="deletePred text-red-500 text-sm ml-2">Delete</button>` : ""}
+        </div>
+
+        <div>
+          <label class="text-sm block">Result:</label>
+          ${
+            currentUser === "david" || result ? `
+              <input type="number" min="0" class="border p-1 w-12 resHome" value="${resHome}" ${currentUser !== "david" ? 'disabled' : ''}>
+              :
+              <input type="number" min="0" class="border p-1 w-12 resAway" value="${resAway}" ${currentUser !== "david" ? 'disabled' : ''}>
+              ${currentUser === "david" ? `<button class="saveRes text-green-600 text-sm ml-2">Save</button>` : ""}
+            ` : (currentUser === "david" ? `<span class="text-sm text-gray-500">Not submitted</span>` : "")
+          }
+        </div>
+      </div>
+
+      <div class="text-sm mt-2 playersPredictions"></div>
+    `;
+
+    fixturesContainer.appendChild(div);
+
+    // Add event listeners here in Part 4
+  });
+
+  renderLeaderboards(predictions, results, fixtures);
+}
+  fixtures.forEach(fixture => {
+    const div = [...document.querySelectorAll(".border.bg-white")].find(d =>
+      d.querySelector(".homeTeam")?.textContent === fixture.home &&
+      d.querySelector(".awayTeam")?.textContent === fixture.away
+    );
+
+    const result = results[fixture.id];
+    const pred = predictions[fixture.id]?.[currentUser];
+    const isLocked = !!result;
+
+    // Save prediction
+    div.querySelector(".savePred")?.addEventListener("click", async () => {
+      const h = div.querySelector(".predHome").value;
+      const a = div.querySelector(".predAway").value;
+      const snap = await getDoc(doc(db, "predictions", currentGameweek));
+      const data = snap.exists() ? snap.data() : {};
+      if (!data[fixture.id]) data[fixture.id] = {};
+      data[fixture.id][currentUser] = { home: +h, away: +a };
+      await setDoc(doc(db, "predictions", currentGameweek), data);
+      loadGameweekData();
+    });
+
+    // Delete prediction
+    div.querySelector(".deletePred")?.addEventListener("click", async () => {
+      const snap = await getDoc(doc(db, "predictions", currentGameweek));
+      if (!snap.exists()) return;
+      const data = snap.data();
+      if (data[fixture.id]) {
+        delete data[fixture.id][currentUser];
+        if (Object.keys(data[fixture.id]).length === 0) delete data[fixture.id];
+      }
+      await setDoc(doc(db, "predictions", currentGameweek), data);
+      loadGameweekData();
+    });
+
+    // Save result
+    div.querySelector(".saveRes")?.addEventListener("click", async () => {
+      const h = div.querySelector(".resHome").value;
+      const a = div.querySelector(".resAway").value;
+      const snap = await getDoc(doc(db, "results", currentGameweek));
+      const data = snap.exists() ? snap.data() : {};
+      data[fixture.id] = { home: +h, away: +a };
+      await setDoc(doc(db, "results", currentGameweek), data);
+      loadGameweekData();
+    });
+
+    // Edit fixture
+    div.querySelector(".editBtn")?.addEventListener("click", async () => {
+      const newHome = prompt("New home team name:", fixture.home);
+      const newAway = prompt("New away team name:", fixture.away);
+      if (newHome && newAway) {
+        await setDoc(doc(db, "fixtures", fixture.id), { home: newHome, away: newAway });
+        loadGameweekData();
       }
     });
-    const week = closest || "1";
-    currentGameweek = week;
-    await loadGameweekOptions(week);
-  }
 
-  async function loadGameweekOptions(selected) {
-    const snapshot = await getDocs(collection(db, "fixtures"));
-    const weeks = [...new Set(snapshot.docs.map(d => d.id.split("_")[0]))].sort((a, b) => +a - +b);
-    document.getElementById("gameweekSelect").innerHTML = weeks.map(w =>
-      `<option value="${w}">Gameweek ${w}</option>`).join("");
-    document.getElementById("gameweekSelect").value = selected;
-  }
+    // Delete fixture
+    div.querySelector(".deleteFixtureBtn")?.addEventListener("click", async () => {
+      await deleteDoc(doc(db, "fixtures", fixture.id));
+      loadGameweekData();
+    });
 
-  document.getElementById("gameweekSelect").onchange = async (e) => {
-    currentGameweek = e.target.value;
-    await loadGameweekData();
-  };
+    // Display all predictions only after current player has predicted
+    const predContainer = div.querySelector(".playersPredictions");
+    const allPreds = predictions[fixture.id] || {};
+    const res = results[fixture.id];
 
-  document.getElementById("logoutBtn").onclick = () => location.reload();
-
-  document.getElementById("changePasswordBtn").onclick = async () => {
-    const user = document.getElementById("username").value;
-    const newPass = prompt("Enter new password:");
-    if (!user || !newPass) return;
-    await setDoc(doc(db, "passwords", user), { password: newPass });
-    alert("Password changed!");
-  };
-
-  document.getElementById("resetPasswordBtn").onclick = async () => {
-    const user = document.getElementById("resetUserSelect").value;
-    const newPass = document.getElementById("newPasswordInput").value;
-    if (!newPass) return;
-    await setDoc(doc(db, "passwords", user), { password: newPass });
-    alert("Password reset.");
-  };
-
-  document.getElementById("addFixtureBtn").onclick = async () => {
-    const home = document.getElementById("newHomeTeam").value.trim();
-    const away = document.getElementById("newAwayTeam").value.trim();
-    if (!home || !away) return;
-    const id = `${currentGameweek}_${home}_${away}_${Date.now()}`;
-    await setDoc(doc(db, "fixtures", id), { home, away });
-    await loadGameweekData();
-  };
-
-  document.getElementById("setDeadlineBtn").onclick = async () => {
-    const dt = document.getElementById("deadlineInput").value;
-    if (!dt) return;
-    await setDoc(doc(db, "deadlines", currentGameweek), { deadline: dt });
-    await loadGameweekData();
-  };
-
-  async function loadGameweekData() {
-    const container = document.getElementById("fixturesContainer");
-    const results = (await getDoc(doc(db, "results", currentGameweek))).data() || {};
-    const predictions = (await getDoc(doc(db, "predictions", currentGameweek))).data() || {};
-    const deadlines = (await getDoc(doc(db, "deadlines", currentGameweek))).data();
-    const fixtureDocs = await getDocs(collection(db, "fixtures"));
-    const fixtures = fixtureDocs.docs.filter(d => d.id.startsWith(currentGameweek + "_")).map(d => ({ id: d.id, ...d.data() }));
-
-    container.innerHTML = "";
-    document.getElementById("gameweekDeadline").textContent = deadlines ? `Deadline: ${new Date(deadlines.deadline).toLocaleString()}` : "";
-
-    for (let fixture of fixtures) {
-      const div = document.createElement("div");
-      div.className = "border p-3 my-2 bg-white rounded shadow";
-
-      const fid = fixture.id;
-      const pred = predictions[fid]?.[currentUser];
-      const res = results[fid];
-      const isLocked = !!res;
-
-      const home = fixture.home;
-      const away = fixture.away;
-      div.innerHTML = `
-        <div class="font-semibold">${home} vs ${away}</div>
-        <div class="mt-2 flex space-x-4">
-          <div>
-            <label class="text-sm block">Your Prediction:</label>
-            <input type="number" min="0" class="border p-1 w-12 predHome" value="${pred?.home ?? ''}" ${isLocked ? 'disabled' : ''}>
-            :
-            <input type="number" min="0" class="border p-1 w-12 predAway" value="${pred?.away ?? ''}" ${isLocked ? 'disabled' : ''}>
-            ${!isLocked ? `<button class="savePred text-blue-600 text-sm ml-2">Save</button>` : ""}
-            ${pred && !isLocked ? `<button class="deletePred text-red-500 text-sm ml-2">Delete</button>` : ""}
-          </div>
-          <div>
-            <label class="text-sm block">Result:</label>
-            ${
-              currentUser === "david" || res
-              ? `
-                <input type="number" min="0" class="border p-1 w-12 resHome" value="${res?.home ?? ''}" ${currentUser !== "david" ? 'disabled' : ''}>
-                :
-                <input type="number" min="0" class="border p-1 w-12 resAway" value="${res?.away ?? ''}" ${currentUser !== "david" ? 'disabled' : ''}>
-                ${currentUser === "david" ? `<button class="saveRes text-green-600 text-sm ml-2">Save</button>` : ""}
-              `
-              : currentUser === "david"
-              ? `<span class="text-sm text-gray-500">Enter result</span>`
-              : ""
-            }
-          </div>
-        </div>
-        <div class="text-sm mt-2 playersPredictions"></div>
-      `;
-      container.appendChild(div);
-
-      // Save prediction
-      div.querySelector(".savePred")?.onclick = async () => {
-        const h = div.querySelector(".predHome").value;
-        const a = div.querySelector(".predAway").value;
-        const snap = await getDoc(doc(db, "predictions", currentGameweek));
-        const data = snap.exists() ? snap.data() : {};
-        if (!data[fid]) data[fid] = {};
-        data[fid][currentUser] = { home: +h, away: +a };
-        await setDoc(doc(db, "predictions", currentGameweek), data);
-        loadGameweekData();
-      };
-
-      // Delete prediction
-      div.querySelector(".deletePred")?.onclick = async () => {
-        const snap = await getDoc(doc(db, "predictions", currentGameweek));
-        const data = snap.exists() ? snap.data() : {};
-        if (data[fid]) {
-          delete data[fid][currentUser];
-          if (Object.keys(data[fid]).length === 0) delete data[fid];
-        }
-        await setDoc(doc(db, "predictions", currentGameweek), data);
-        loadGameweekData();
-      };
-
-      // Save result
-      div.querySelector(".saveRes")?.onclick = async () => {
-        const h = div.querySelector(".resHome").value;
-        const a = div.querySelector(".resAway").value;
-        const snap = await getDoc(doc(db, "results", currentGameweek));
-        const data = snap.exists() ? snap.data() : {};
-        data[fid] = { home: +h, away: +a };
-        await setDoc(doc(db, "results", currentGameweek), data);
-        loadGameweekData();
-      };
-
-      // Show all predictions only after current user submits
-      const all = predictions[fid] || {};
-      if (pred) {
-        div.querySelector(".playersPredictions").innerHTML = Object.entries(all)
-          .map(([u, p]) => `${capitalize(u)}: ${p.home}:${p.away}${res ? ` (${calcPoints(p, res)} pts)` : ""}`)
-          .join("<br>");
+    if (pred) {
+      let predText = "";
+      for (let user in allPreds) {
+        const p = allPreds[user];
+        const pts = res ? calculatePoints(p, res) : "-";
+        predText += `${user.charAt(0).toUpperCase() + user.slice(1)}: ${p.home}:${p.away} (${pts} pts)<br>`;
       }
+      predContainer.innerHTML = predText;
+    } else {
+      predContainer.innerHTML = `<span class="text-gray-400 italic">Submit your prediction to see others.</span>`;
     }
+  });
+}
 
-    renderLeaderboards(predictions, results, fixtures);
+function calculatePoints(pred, res) {
+  let pts = 0;
+  if (pred.home === res.home) pts++;
+  if (pred.away === res.away) pts++;
+  if (Math.sign(pred.home - pred.away) === Math.sign(res.home - res.away)) pts += 2;
+  if (pred.home === res.home && pred.away === res.away) pts++;
+  return pts;
+}
+
+function renderLeaderboards(predictions, results, fixtures) {
+  const overall = {};
+  const weekly = {};
+
+  for (let f of fixtures) {
+    const fid = f.id;
+    const res = results[fid];
+    if (!res) continue;
+    const preds = predictions[fid] || {};
+    for (let user in preds) {
+      const pts = calculatePoints(preds[user], res);
+      overall[user] = (overall[user] || 0) + pts;
+      weekly[user] = (weekly[user] || 0) + pts;
+    }
   }
 
-  function calcPoints(pred, res) {
-    let pts = 0;
-    if (pred.home === res.home) pts++;
-    if (pred.away === res.away) pts++;
-    if (Math.sign(pred.home - pred.away) === Math.sign(res.home - res.away)) pts += 2;
-    if (pred.home === res.home && pred.away === res.away) pts++;
-    return pts;
-  }
-
-  function renderLeaderboards(predictions, results, fixtures) {
-    const total = {}, weekly = {};
-    for (let f of fixtures) {
-      const fid = f.id;
-      const res = results[fid];
-      if (!res) continue;
-      const predSet = predictions[fid] || {};
-      for (let user in predSet) {
-        const pts = calcPoints(predSet[user], res);
-        total[user] = (total[user] || 0) + pts;
-        weekly[user] = (weekly[user] || 0) + pts;
-      }
-    }
-
-    const toTable = obj => `<table class="w-full text-sm border">
+  const render = obj =>
+    `<table class="table-auto border w-full text-sm">
       <thead><tr><th class="border px-2">Player</th><th class="border px-2">Points</th></tr></thead>
-      <tbody>${Object.entries(obj).sort((a,b)=>b[1]-a[1]).map(([u,p]) =>
-        `<tr><td class="border px-2">${capitalize(u)}</td><td class="border px-2">${p}</td></tr>`).join("")}</tbody>
-    </table>`;
+      <tbody>
+        ${Object.entries(obj).sort((a,b)=>b[1]-a[1]).map(([u,p]) =>
+          `<tr><td class="border px-2">${u.charAt(0).toUpperCase() + u.slice(1)}</td><td class="border px-2">${p}</td></tr>`).join("")}
+      </tbody></table>`;
 
-    document.getElementById("leaderboardOverall").innerHTML = toTable(total);
-    document.getElementById("leaderboardWeekly").innerHTML = toTable(weekly);
-  }
+  document.getElementById("leaderboardOverall").innerHTML = render(overall);
+  document.getElementById("leaderboardWeekly").innerHTML = render(weekly);
+}
+function populatePasswordResetDropdown() {
+  document.getElementById("resetUserSelect").innerHTML =
+    Object.keys(users).map(u => `<option value="${u}">${u.charAt(0).toUpperCase() + u.slice(1)}</option>`).join("");
+}
+
+document.getElementById("resetPasswordBtn").onclick = async () => {
+  const user = document.getElementById("resetUserSelect").value;
+  const pass = document.getElementById("newPasswordInput").value.trim();
+  if (!pass) return alert("Enter new password");
+  await setDoc(doc(db, "passwords", user), { password: pass });
+  alert("Password updated");
+  document.getElementById("newPasswordInput").value = "";
+};
+
+document.getElementById("addFixtureBtn").onclick = async () => {
+  const home = document.getElementById("newHomeTeam").value.trim();
+  const away = document.getElementById("newAwayTeam").value.trim();
+  if (!home || !away) return alert("Enter both teams");
+  const id = `${currentGameweek}_${home}_${away}_${Date.now()}`;
+  await setDoc(doc(db, "fixtures", id), { home, away });
+  document.getElementById("newHomeTeam").value = "";
+  document.getElementById("newAwayTeam").value = "";
+  loadGameweekData();
+};
+
+document.getElementById("setDeadlineBtn").onclick = async () => {
+  const deadline = document.getElementById("deadlineInput").value;
+  if (!deadline) return;
+  await setDoc(doc(db, "deadlines", currentGameweek), { deadline });
+  loadGameweekData();
+};
 </script>
 </body>
 </html>
