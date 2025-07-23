@@ -117,8 +117,8 @@ const welcomeUser = document.getElementById("welcomeUser");
 loginBtn.onclick = async () => {
   const user = document.getElementById("username").value;
   const pass = document.getElementById("password").value;
-  const savedPass = (await getDoc(doc(db, "passwords", user))).data()?.password;
-  if (users[user] && (pass === users[user] || pass === savedPass)) {
+const docSnap = await getDoc(doc(db, "passwords", user));
+const savedPass = docSnap.exists() ? docSnap.data().password : null;  if (users[user] && (pass === users[user] || pass === savedPass)) {
     currentUser = user;
     loginSection.style.display = "none";
     appDiv.style.display = "block";
