@@ -446,10 +446,8 @@ document.addEventListener("click", async (e) => {
     data.last5.forEach(m => {
       html += `• ${m.home} ${m.gh}-${m.ga} ${m.away} (${m.date})\n`;
     });
-
-    html += `Total matches: ${data.last5.length + (data.summary.wins + data.summary.losses + data.summary.draws - data.last5.length)}\n\n`;
-    
-    html += `\nSummary:\n- \n- ${home} Wins: ${data.summary.wins}\n- Draws: ${data.summary.draws}\n- ${away} Wins: ${data.summary.losses}`;
+  
+    html += `\nSummary:\n-Total matches: ${data.last5.length + (data.summary.wins + data.summary.losses + data.summary.draws - data.last5.length)} \n- ${home} Wins: ${data.summary.wins}\n- Draws: ${data.summary.draws}\n- ${away} Wins: ${data.summary.losses}`;
     html += `\n- ${home} Goals: ${data.summary.goalsFor}\n- ${away} Goals: ${data.summary.goalsAgainst}`;
 
     html += `\n\nBiggest Wins:\n- ${home}: ${data.biggestWin[home] || "–"}\n- ${away}: ${data.biggestWin[away] || "–"}`;
