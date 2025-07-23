@@ -440,6 +440,7 @@ document.addEventListener("click", async (e) => {
     content.textContent = `No history found for ${key}`;
   } else {
     const data = snap.data();
+    const sumtemp = ${data.summary.wins}+${data.summary.losses}+${data.summary.draws};
     let html = `📊 Head-to-Head: ${key}\n\n`;
 
     html += "Last 5 matches:\n";
@@ -447,7 +448,7 @@ document.addEventListener("click", async (e) => {
       html += `• ${m.home} ${m.gh}-${m.ga} ${m.away} (${m.date})\n`;
     });
 
-    html += `\nSummary:\n- Matches: ${data.summary.wins}+${data.summary.losses}+${data.summary.draws}\n- ${home} Wins: ${data.summary.wins}\n- Draws: ${data.summary.draws}\n- ${away} Wins: ${data.summary.losses}`;
+    html += `\nSummary:\n- Matches: sumtemp\n- ${home} Wins: ${data.summary.wins}\n- Draws: ${data.summary.draws}\n- ${away} Wins: ${data.summary.losses}`;
     html += `\n- ${home} Goals: ${data.summary.goalsFor}\n- ${away} Goals: ${data.summary.goalsAgainst}`;
 
     html += `\n\nBiggest Wins:\n- ${home}: ${data.biggestWin[home] || "–"}\n- ${away}: ${data.biggestWin[away] || "–"}`;
