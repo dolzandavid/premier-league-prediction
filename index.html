@@ -286,7 +286,7 @@ async function loadGameweekData() {
       <div class="text-sm mt-2 playersPredictions"></div>
     `;
 const historyBtn = document.createElement('button');
-historyBtn.textContent = "History";
+historyBtn.textContent = "Fixture History";
 historyBtn.className = "historyBtn bg-yellow-100 hover:bg-yellow-200 px-2 py-1 rounded text-sm ml-2";
 div.appendChild(historyBtn);
 
@@ -447,8 +447,8 @@ document.addEventListener("click", async (e) => {
       html += `• ${m.home} ${m.gh}-${m.ga} ${m.away} (${m.date})\n`;
     });
 
-    html += `\nSummary:\n- Wins: ${data.summary.wins}\n- Losses: ${data.summary.losses}\n- Draws: ${data.summary.draws}`;
-    html += `\n- Goals For: ${data.summary.goalsFor}\n- Goals Against: ${data.summary.goalsAgainst}`;
+    html += `\nSummary:\n- Home Wins: ${data.summary.wins}\n- Away Wins: ${data.summary.losses}\n- Draws: ${data.summary.draws}`;
+    html += `\n- Home Goals: ${data.summary.goalsFor}\n- Away Goals: ${data.summary.goalsAgainst}`;
 
     html += `\n\nBiggest Wins:\n- ${home}: ${data.biggestWin[home] || "–"}\n- ${away}: ${data.biggestWin[away] || "–"}`;
 
