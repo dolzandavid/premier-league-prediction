@@ -19,129 +19,148 @@
   <div class="max-w-5xl mx-auto p-4">
     <h1 class="text-2xl font-bold mb-4 text-center">Premier League Prediction Game</h1>
 
-    <!-- LOGIN SECTION -->
-    <div id="loginSection" class="mb-6">
-      <select id="username" class="border p-2 mr-2">
-        <option value="" disabled selected>Select user</option>
-        <option value="david">David</option>
-        <option value="katja">Katja</option>
-        <option value="mark">Mark</option>
-        <option value="jus">Jus</option>
-      </select>
-      <input id="password" type="password" class="border p-2 mr-2" placeholder="Password" />
-      <button id="loginBtn" class="bg-blue-500 text-white px-4 py-2">Login</button>
+    <!-- LOGIN + CHANGE PASSWORD SECTION -->
+    <div id="loginSection" class="mb-6 space-y-4">
+      <div>
+        <select id="username" class="border p-2 mr-2">
+          <option value="" disabled selected>Select user</option>
+          <option value="david">David</option>
+          <option value="katja">Katja</option>
+          <option value="mark">Mark</option>
+          <option value="jus">Jus</option>
+        </select>
+        <input id="password" type="password" class="border p-2 mr-2" placeholder="Password" />
+        <button id="loginBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Login</button>
+      </div>
+      <div class="text-sm">
+        <button id="showChangePwBtn" class="text-blue-500 hover:underline">Change password</button>
+      </div>
+      <div id="changePwSection" class="hidden space-y-2">
+        <h3 class="font-semibold">Change Password</h3>
+        <input id="oldPw" type="password" class="border p-2 w-full" placeholder="Old Password" />
+        <input id="newPw" type="password" class="border p-2 w-full" placeholder="New Password" />
+        <button id="changePwBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded">Change Password</button>
+      </div>
     </div>
-
     <!-- APP UI -->
     <div id="app" style="display:none;">
       <div class="flex justify-between items-center mb-4">
         <span id="welcomeUser" class="font-semibold"></span>
-        <button id="logoutBtn" class="bg-gray-400 text-white px-3 py-1 rounded">Logout</button>
+        <button id="logoutBtn" class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded">Logout</button>
       </div>
 
-      <!-- Gameweek Picker -->
-      <div class="mb-4">
+      <!-- Gameweek Selector -->
+      <div class="mb-4 flex items-center">
         <label for="gameweekSelect" class="mr-2 font-medium">Gameweek:</label>
         <select id="gameweekSelect" class="border p-2"></select>
         <span id="gameweekDeadline" class="ml-4 text-sm text-gray-600"></span>
       </div>
-
-      <!-- Fixture Editor (David only) -->
+      <!-- Fixture Editor (David) -->
       <div id="fixtureEditor" class="mb-6 hidden">
         <h2 class="text-lg font-semibold mb-2">Edit Fixtures</h2>
-        <input id="newHomeTeam" class="border p-2 mr-2" placeholder="Home Team" />
-        <input id="newAwayTeam" class="border p-2 mr-2" placeholder="Away Team" />
-        <button id="addFixtureBtn" class="bg-green-500 text-white px-3 py-1">Add Fixture</button>
-        <div class="mt-2">
+        <div class="flex items-center space-x-2">
+          <input id="newHomeTeam" class="border p-2" placeholder="Home Team" />
+          <input id="newAwayTeam" class="border p-2" placeholder="Away Team" />
+          <button id="addFixtureBtn" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded">Add Fixture</button>
+        </div>
+        <div class="mt-2 flex items-center space-x-2">
           <label class="text-sm">Deadline:</label>
-          <input type="datetime-local" id="deadlineInput" class="border p-1 ml-2" />
-          <button id="setDeadlineBtn" class="bg-blue-500 text-white px-2 py-1 ml-2 text-sm">Set Deadline</button>
+          <input type="datetime-local" id="deadlineInput" class="border p-1" />
+          <button id="setDeadlineBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">Set Deadline</button>
         </div>
       </div>
 
-      <!-- Fixtures Container -->
+      <!-- Fixtures -->
       <div id="fixturesContainer" class="mb-8"></div>
 
       <!-- Leaderboards -->
       <div class="mb-6">
         <h2 class="text-lg font-semibold mb-2">Overall Leaderboard</h2>
         <div id="leaderboardOverall" class="overflow-x-auto"></div>
-
         <h2 class="text-lg font-semibold mt-6 mb-2">Weekly Leaderboard</h2>
         <div id="leaderboardWeekly" class="overflow-x-auto"></div>
       </div>
 
-      <!-- Password Reset Section (David only) -->
+      <!-- Password Reset (David) -->
       <div id="passwordResetSection" class="hidden mb-8">
         <h2 class="text-lg font-semibold mb-2">Reset Player Password</h2>
         <select id="resetUserSelect" class="border p-2 mr-2"></select>
         <input id="newPasswordInput" class="border p-2 mr-2" placeholder="New Password" />
-        <button id="resetPasswordBtn" class="bg-red-500 text-white px-3 py-1">Reset Password</button>
+        <button id="resetPasswordBtn" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded">Reset Password</button>
       </div>
-    </div> <!-- end #app -->
-  </div> <!-- end .container -->
-
-<script type="module">
+    </div>
+  </div>
+  <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyA2WG0LUwLCDqmylgezCZ0aH5Q8vTaXTKU",
+  apiKey: "...",
   authDomain: "pl-predictor-13a6d.firebaseapp.com",
   projectId: "pl-predictor-13a6d",
-  storageBucket: "pl-predictor-13a6d.appspot.com",
-  messagingSenderId: "286908896536",
-  appId: "1:286908896536:web:dabd76b4faaa72a98cfa6d"
+  storageBucket: "...",
+  messagingSenderId: "...",
+  appId: "..."
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const users = {
-  david: "david123",
-  katja: "katja123",
-  mark: "mark123",
-  jus: "jus123"
-};
+const users = { david:"david123", katja:"katja123", mark:"mark123", jus:"jus123" };
 
-let currentUser = "";
-let currentGameweek = "";
-let deadlinesByWeek = {};
+let currentUser="", currentGameweek="", deadlinesByWeek={};
 
 const loginBtn = document.getElementById("loginBtn");
+const showChangePwBtn = document.getElementById("showChangePwBtn");
+const changePwSection = document.getElementById("changePwSection");
+const oldPw = document.getElementById("oldPw");
+const newPw = document.getElementById("newPw");
+const changePwBtn = document.getElementById("changePwBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 const appDiv = document.getElementById("app");
 const loginSection = document.getElementById("loginSection");
 const welcomeUser = document.getElementById("welcomeUser");
 
+// Toggle change-password form
+showChangePwBtn.onclick = () => changePwSection.classList.toggle("hidden");
+
+// Handle password change
+changePwBtn.onclick = async () => {
+  const user = document.getElementById("username").value;
+  const oldPass = oldPw.value, newPass = newPw.value;
+  if (!user || !oldPass || !newPass) return alert("Fill all fields");
+  const snap = await getDoc(doc(db,"passwords",user));
+  const saved = snap.exists() ? snap.data().password : users[user];
+  if (oldPass !== saved) return alert("Old password is incorrect");
+  await setDoc(doc(db,"passwords",user),{password:newPass});
+  alert("Password changed!");
+  oldPw.value=""; newPw.value="";
+});
+
+// Login handler
 loginBtn.onclick = async () => {
   console.log("Login clicked");
   const user = document.getElementById("username").value;
   const pass = document.getElementById("password").value;
-  const docSnap = await getDoc(doc(db, "passwords", user));
-  const savedPass = docSnap.exists() ? docSnap.data().password : null;
-
-  if (users[user] && (pass === users[user] || pass === savedPass)) {
-    currentUser = user;
-    loginSection.style.display = "none";
-    appDiv.style.display = "block";
-    welcomeUser.textContent = `Welcome, ${user.charAt(0).toUpperCase() + user.slice(1)}`;
-
-    if (user === "david") {
+  const snap = await getDoc(doc(db, "passwords", user));
+  const saved = snap.exists() ? snap.data().password : users[user];
+  if (users[user] && pass===saved) {
+    currentUser=user;
+    loginSection.style.display="none";
+    appDiv.style.display="block";
+    welcomeUser.textContent=`Welcome, ${user.charAt(0).toUpperCase()+user.slice(1)}`;
+    if (user==="david") {
       document.getElementById("fixtureEditor").classList.remove("hidden");
       document.getElementById("passwordResetSection").classList.remove("hidden");
       populatePasswordResetDropdown();
-
-      const allFixtures = await getDocs(collection(db, "fixtures"));
-      if (allFixtures.empty) {
-        for (let gw = 1; gw <= 38; gw++) {
-          const id = `${gw}_Team A_Team B_${Date.now() + gw}`;
-          await setDoc(doc(db, "fixtures", id), { home: "Team A", away: "Team B" });
+      const all = await getDocs(collection(db,"fixtures"));
+      if (all.empty) {
+        for(let gw=1;gw<=38;gw++){
+          const id=`${gw}_Team A_Team B_${Date.now()+gw}`;
+          await setDoc(doc(db,"fixtures",id),{home:"Team A",away:"Team B"});
         }
-        alert("Auto-generated 38 gameweeks with placeholder fixtures.");
+        alert("Auto-generated placeholder fixtures.");
       }
     }
-
     await loadGameweeks();
   } else {
     alert("Invalid login");
@@ -155,8 +174,7 @@ async function loadGameweeks() {
   const deadlineDocs = await getDocs(collection(db, "deadlines"));
 
   const weeks = [...new Set(fixtureDocs.docs.map(d => d.id.split("_")[0]))]
-    .filter(Boolean)
-    .sort((a, b) => +a - +b);
+    .filter(Boolean).sort((a, b) => +a - +b);
 
   deadlinesByWeek = {};
   deadlineDocs.forEach(docSnap => {
@@ -167,8 +185,7 @@ async function loadGameweeks() {
   });
 
   const now = new Date();
-  let closestWeek = null;
-  let minDiff = Infinity;
+  let closestWeek = null, minDiff = Infinity;
   for (let week of weeks) {
     const deadline = deadlinesByWeek[week];
     if (deadline) {
@@ -181,11 +198,9 @@ async function loadGameweeks() {
   }
 
   currentGameweek = closestWeek || weeks[0] || "1";
-
-  document.getElementById("gameweekSelect").innerHTML = weeks
-    .map(w => `<option value="${w}">Gameweek ${w}</option>`)
-    .join("");
-  document.getElementById("gameweekSelect").value = currentGameweek;
+  const gameweekSelect = document.getElementById("gameweekSelect");
+  gameweekSelect.innerHTML = weeks.map(w => `<option value="${w}">Gameweek ${w}</option>`).join("");
+  gameweekSelect.value = currentGameweek;
   loadGameweekData();
 }
 
@@ -203,59 +218,57 @@ async function loadGameweekData() {
   const predictionsDoc = await getDoc(doc(db, "predictions", currentGameweek));
   const deadlineDoc = await getDoc(doc(db, "deadlines", currentGameweek));
 
-  const fixtures = fixtureDocs.docs.filter(d => d.id.startsWith(currentGameweek + "_")).map(d => ({ id: d.id, ...d.data() }));
+  const fixtures = fixtureDocs.docs
+    .filter(d => d.id.startsWith(currentGameweek + "_"))
+    .map(d => ({ id: d.id, ...d.data() }));
+
   const results = resultsDoc.exists() ? resultsDoc.data() : {};
   const predictions = predictionsDoc.exists() ? predictionsDoc.data() : {};
   const deadline = deadlineDoc.exists() ? deadlineDoc.data()?.deadline : null;
 
-  document.getElementById("gameweekDeadline").textContent = deadline ? `Deadline: ${new Date(deadline).toLocaleString()}` : "";
+  document.getElementById("gameweekDeadline").textContent = deadline
+    ? `Deadline: ${new Date(deadline).toLocaleString()}`
+    : "";
 
   for (const fixture of fixtures) {
-    const div = document.createElement("div");
-    div.className = "border p-3 my-2 bg-white rounded shadow";
-
     const result = results[fixture.id];
     const pred = predictions[fixture.id]?.[currentUser];
     const isLocked = !!result;
 
-    const home = fixture.home;
-    const away = fixture.away;
-    const predHome = pred?.home ?? "";
-    const predAway = pred?.away ?? "";
-    const resHome = result?.home ?? "";
-    const resAway = result?.away ?? "";
+    const div = document.createElement("div");
+    div.className = "border p-3 my-2 bg-white rounded shadow";
 
     div.innerHTML = `
       <div class="flex justify-between items-center">
         <div class="font-semibold">
-          <span class="homeTeam">${home}</span> vs <span class="awayTeam">${away}</span>
+          <span class="homeTeam">${fixture.home}</span> vs <span class="awayTeam">${fixture.away}</span>
         </div>
         ${currentUser === "david" ? `
           <div>
-            <button class="text-blue-600 text-sm editBtn">✏️ Edit</button>
-            <button class="text-red-500 text-sm deleteFixtureBtn">🗑️</button>
+            <button class="editBtn bg-blue-100 hover:bg-blue-200 px-2 py-1 rounded text-sm">Edit</button>
+            <button class="deleteFixtureBtn bg-red-100 hover:bg-red-200 px-2 py-1 rounded text-sm">Delete</button>
           </div>` : ""}
       </div>
 
       <div class="mt-2 flex space-x-4">
         <div>
           <label class="text-sm block">Your Prediction:</label>
-          <input type="number" min="0" class="border p-1 w-12 predHome" value="${predHome}" ${isLocked ? 'disabled' : ''}>
+          <input type="number" min="0" class="border p-1 w-12 predHome" value="${pred?.home ?? ""}" ${isLocked ? "disabled" : ""}>
           :
-          <input type="number" min="0" class="border p-1 w-12 predAway" value="${predAway}" ${isLocked ? 'disabled' : ''}>
-          ${!isLocked ? `<button class="savePred text-blue-600 text-sm ml-2">Save</button>` : ""}
-          ${!isLocked && pred ? `<button class="deletePred text-red-500 text-sm ml-2">Delete</button>` : ""}
+          <input type="number" min="0" class="border p-1 w-12 predAway" value="${pred?.away ?? ""}" ${isLocked ? "disabled" : ""}>
+          ${!isLocked ? `<button class="savePred bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 ml-2 rounded text-sm">Save</button>` : ""}
+          ${!isLocked && pred ? `<button class="deletePred bg-red-500 hover:bg-red-600 text-white px-2 py-1 ml-2 rounded text-sm">Delete</button>` : ""}
         </div>
 
         <div>
-          <label class="text-sm block">Result:</label>
           ${
-            currentUser === "david" || result ? `
-              <input type="number" min="0" class="border p-1 w-12 resHome" value="${resHome}" ${currentUser !== "david" ? 'disabled' : ''}>
-              :
-              <input type="number" min="0" class="border p-1 w-12 resAway" value="${resAway}" ${currentUser !== "david" ? 'disabled' : ''}>
-              ${currentUser === "david" ? `<button class="saveRes text-green-600 text-sm ml-2">Save</button>` : ""}
-            ` : (currentUser === "david" ? `<span class="text-sm text-gray-500">Not submitted</span>` : "")
+            currentUser === "david" || result
+              ? `<label class="text-sm block">Result:</label>
+                <input type="number" min="0" class="border p-1 w-12 resHome" value="${result?.home ?? ""}" ${currentUser !== "david" ? "disabled" : ""}>
+                :
+                <input type="number" min="0" class="border p-1 w-12 resAway" value="${result?.away ?? ""}" ${currentUser !== "david" ? "disabled" : ""}>
+                ${currentUser === "david" ? `<button class="saveRes bg-green-500 hover:bg-green-600 text-white px-2 py-1 ml-2 rounded text-sm">Save</button>` : ""}`
+              : ""
           }
         </div>
       </div>
@@ -265,7 +278,7 @@ async function loadGameweekData() {
 
     fixturesContainer.appendChild(div);
 
-    // Add event listeners
+    // --- Event Listeners ---
     div.querySelector(".savePred")?.addEventListener("click", async () => {
       const h = div.querySelector(".predHome").value;
       const a = div.querySelector(".predAway").value;
@@ -281,10 +294,8 @@ async function loadGameweekData() {
       const snap = await getDoc(doc(db, "predictions", currentGameweek));
       if (!snap.exists()) return;
       const data = snap.data();
-      if (data[fixture.id]) {
-        delete data[fixture.id][currentUser];
-        if (Object.keys(data[fixture.id]).length === 0) delete data[fixture.id];
-      }
+      delete data[fixture.id][currentUser];
+      if (Object.keys(data[fixture.id]).length === 0) delete data[fixture.id];
       await setDoc(doc(db, "predictions", currentGameweek), data);
       loadGameweekData();
     });
@@ -313,27 +324,25 @@ async function loadGameweekData() {
       loadGameweekData();
     });
 
-    // Show predictions only if current player has predicted
-    const predContainer = div.querySelector(".playersPredictions");
-    const allPreds = predictions[fixture.id] || {};
-    const res = results[fixture.id];
-
+    // Show predictions
+    const predDiv = div.querySelector(".playersPredictions");
     if (pred) {
-      let predText = "";
-      for (let user in allPreds) {
-        const p = allPreds[user];
+      let html = "";
+      const all = predictions[fixture.id] || {};
+      for (let player in all) {
+        const p = all[player];
+        const res = results[fixture.id];
         const pts = res ? calculatePoints(p, res) : "-";
-        predText += `${user.charAt(0).toUpperCase() + user.slice(1)}: ${p.home}:${p.away} (${pts} pts)<br>`;
+        html += `${player.charAt(0).toUpperCase() + player.slice(1)}: ${p.home}:${p.away} (${pts} pts)<br>`;
       }
-      predContainer.innerHTML = predText;
+      predDiv.innerHTML = html;
     } else {
-      predContainer.innerHTML = `<span class="text-gray-400 italic">Submit your prediction to see others.</span>`;
+      predDiv.innerHTML = `<span class="text-gray-400 italic">Submit your prediction to see others.</span>`;
     }
   }
 
   renderLeaderboards(predictions, results, fixtures);
 }
-
 function calculatePoints(pred, res) {
   let pts = 0;
   if (pred.home === res.home) pts++;
