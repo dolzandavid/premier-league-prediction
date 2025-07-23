@@ -115,6 +115,7 @@ const loginSection = document.getElementById("loginSection");
 const welcomeUser = document.getElementById("welcomeUser");
 
 loginBtn.onclick = async () => {
+console.log("Login clicked");
   const user = document.getElementById("username").value;
   const pass = document.getElementById("password").value;
 const docSnap = await getDoc(doc(db, "passwords", user));
