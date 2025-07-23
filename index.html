@@ -16,6 +16,15 @@
   </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
+<!-- History Modal -->
+<div id="historyModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+  <div class="bg-white p-6 rounded shadow-lg max-w-lg w-full">
+    <h2 class="text-lg font-semibold mb-4">Fixture History</h2>
+    <div id="historyContent" class="text-sm max-h-80 overflow-y-auto whitespace-pre-wrap"></div>
+    <button id="closeHistoryBtn" class="mt-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded">Close</button>
+  </div>
+</div>
+
   <div class="max-w-5xl mx-auto p-4">
     <h1 class="text-2xl font-bold mb-4 text-center">Premier League Prediction Game</h1>
 
@@ -276,6 +285,10 @@ async function loadGameweekData() {
 
       <div class="text-sm mt-2 playersPredictions"></div>
     `;
+const historyBtn = document.createElement('button');
+historyBtn.textContent = "History";
+historyBtn.className = "historyBtn bg-yellow-100 hover:bg-yellow-200 px-2 py-1 rounded text-sm ml-2";
+div.appendChild(historyBtn);
 
     fixturesContainer.appendChild(div);
 
@@ -412,6 +425,42 @@ document.getElementById("setDeadlineBtn").onclick = async () => {
   await setDoc(doc(db, "deadlines", currentGameweek), { deadline });
   loadGameweekData();
 };
+// Show history modal
+document.addEventListener("click", async (e) => {
+  if (!e.target.classList.contains("historyBtn")) return;
+  const card = e.target.closest(".border.p-3");
+  const home = card.querySelector(".homeTeam").textContent.trim();
+  const away = card.querySelector(".awayTeam").textContent.trim();
+  const key = `${home} vs ${away}`;
+  const snap = await getDoc(doc(db, "history", key));
+  const modal = document.getElementById("historyModal");
+  const content = document.getElementById("historyContent");
+
+  if (!snap.exists()) {
+    content.textContent = `No history found for ${key}`;
+  } else {
+    const data = snap.data();
+    let html = `📊 Head-to-Head: ${key}\n\n`;
+
+    html += "Last 5 matches:\n";
+    data.last5.forEach(m => {
+      html += `• ${m.home} ${m.gh}-${m.ga} ${m.away} (${m.date})\n`;
+    });
+
+    html += `\nSummary:\n- Wins: ${data.summary.wins}\n- Losses: ${data.summary.losses}\n- Draws: ${data.summary.draws}`;
+    html += `\n- Goals For: ${data.summary.goalsFor}\n- Goals Against: ${data.summary.goalsAgainst}`;
+
+    html += `\n\nBiggest Wins:\n- ${home}: ${data.biggestWin[home] || "–"}\n- ${away}: ${data.biggestWin[away] || "–"}`;
+
+    content.textContent = html;
+  }
+
+  modal.classList.remove("hidden");
+});
+
+document.getElementById("closeHistoryBtn").onclick = () =>
+  document.getElementById("historyModal").classList.add("hidden");
+
 </script>
 </body>
 </html>
