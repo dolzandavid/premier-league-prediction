@@ -135,7 +135,7 @@ changePwBtn.onclick = async () => {
   await setDoc(doc(db,"passwords",user),{password:newPass});
   alert("Password changed!");
   oldPw.value=""; newPw.value="";
-});
+};
 
 // Login handler
 loginBtn.onclick = async () => {
