@@ -115,11 +115,10 @@ const loginSection = document.getElementById("loginSection");
 const welcomeUser = document.getElementById("welcomeUser");
 
 loginBtn.onclick = async () => {
-console.log("Login clicked");
   const user = document.getElementById("username").value;
   const pass = document.getElementById("password").value;
-const docSnap = await getDoc(doc(db, "passwords", user));
-const savedPass = docSnap.exists() ? docSnap.data().password : null;  if (users[user] && (pass === users[user] || pass === savedPass)) {
+  const savedPass = (await getDoc(doc(db, "passwords", user))).data()?.password;
+  if (users[user] && (pass === users[user] || pass === savedPass)) {
     currentUser = user;
     loginSection.style.display = "none";
     appDiv.style.display = "block";
@@ -261,12 +260,7 @@ async function loadGameweekData() {
 
     fixturesContainer.appendChild(div);
 
-    // Add event listeners here in Part 4
-  
-
-  renderLeaderboards(predictions, results, fixtures);
-}
-  fixtures.forEach(fixture => {
+     fixtures.forEach(fixture => {
     const div = [...document.querySelectorAll(".border.bg-white")].find(d =>
       d.querySelector(".homeTeam")?.textContent === fixture.home &&
       d.querySelector(".awayTeam")?.textContent === fixture.away
@@ -382,6 +376,11 @@ function renderLeaderboards(predictions, results, fixtures) {
 
   document.getElementById("leaderboardOverall").innerHTML = render(overall);
   document.getElementById("leaderboardWeekly").innerHTML = render(weekly);
+}
+
+  });
+
+  renderLeaderboards(predictions, results, fixtures);
 }
 function populatePasswordResetDropdown() {
   document.getElementById("resetUserSelect").innerHTML =
