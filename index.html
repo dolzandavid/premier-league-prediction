@@ -81,9 +81,9 @@
     </div> <!-- end #app -->
   </div> <!-- end .container -->
 
-  <script type="module">
+<script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, updateDoc, deleteField, onSnapshot, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyA2WG0LUwLCDqmylgezCZ0aH5Q8vTaXTKU",
@@ -115,14 +115,18 @@ const loginSection = document.getElementById("loginSection");
 const welcomeUser = document.getElementById("welcomeUser");
 
 loginBtn.onclick = async () => {
+  console.log("Login clicked");
   const user = document.getElementById("username").value;
   const pass = document.getElementById("password").value;
-  const savedPass = (await getDoc(doc(db, "passwords", user))).data()?.password;
+  const docSnap = await getDoc(doc(db, "passwords", user));
+  const savedPass = docSnap.exists() ? docSnap.data().password : null;
+
   if (users[user] && (pass === users[user] || pass === savedPass)) {
     currentUser = user;
     loginSection.style.display = "none";
     appDiv.style.display = "block";
     welcomeUser.textContent = `Welcome, ${user.charAt(0).toUpperCase() + user.slice(1)}`;
+
     if (user === "david") {
       document.getElementById("fixtureEditor").classList.remove("hidden");
       document.getElementById("passwordResetSection").classList.remove("hidden");
@@ -137,13 +141,15 @@ loginBtn.onclick = async () => {
         alert("Auto-generated 38 gameweeks with placeholder fixtures.");
       }
     }
-    await loadGameweeks(); // includes automatic closest deadline selection
+
+    await loadGameweeks();
   } else {
     alert("Invalid login");
   }
 };
 
 logoutBtn.onclick = () => location.reload();
+
 async function loadGameweeks() {
   const fixtureDocs = await getDocs(collection(db, "fixtures"));
   const deadlineDocs = await getDocs(collection(db, "deadlines"));
@@ -160,7 +166,6 @@ async function loadGameweeks() {
     }
   });
 
-  // Find gameweek with closest future deadline
   const now = new Date();
   let closestWeek = null;
   let minDiff = Infinity;
@@ -205,7 +210,7 @@ async function loadGameweekData() {
 
   document.getElementById("gameweekDeadline").textContent = deadline ? `Deadline: ${new Date(deadline).toLocaleString()}` : "";
 
-  fixtures.forEach(fixture => {
+  for (const fixture of fixtures) {
     const div = document.createElement("div");
     div.className = "border p-3 my-2 bg-white rounded shadow";
 
@@ -260,17 +265,7 @@ async function loadGameweekData() {
 
     fixturesContainer.appendChild(div);
 
-     fixtures.forEach(fixture => {
-    const div = [...document.querySelectorAll(".border.bg-white")].find(d =>
-      d.querySelector(".homeTeam")?.textContent === fixture.home &&
-      d.querySelector(".awayTeam")?.textContent === fixture.away
-    );
-
-    const result = results[fixture.id];
-    const pred = predictions[fixture.id]?.[currentUser];
-    const isLocked = !!result;
-
-    // Save prediction
+    // Add event listeners
     div.querySelector(".savePred")?.addEventListener("click", async () => {
       const h = div.querySelector(".predHome").value;
       const a = div.querySelector(".predAway").value;
@@ -282,7 +277,6 @@ async function loadGameweekData() {
       loadGameweekData();
     });
 
-    // Delete prediction
     div.querySelector(".deletePred")?.addEventListener("click", async () => {
       const snap = await getDoc(doc(db, "predictions", currentGameweek));
       if (!snap.exists()) return;
@@ -295,7 +289,6 @@ async function loadGameweekData() {
       loadGameweekData();
     });
 
-    // Save result
     div.querySelector(".saveRes")?.addEventListener("click", async () => {
       const h = div.querySelector(".resHome").value;
       const a = div.querySelector(".resAway").value;
@@ -306,7 +299,6 @@ async function loadGameweekData() {
       loadGameweekData();
     });
 
-    // Edit fixture
     div.querySelector(".editBtn")?.addEventListener("click", async () => {
       const newHome = prompt("New home team name:", fixture.home);
       const newAway = prompt("New away team name:", fixture.away);
@@ -316,13 +308,12 @@ async function loadGameweekData() {
       }
     });
 
-    // Delete fixture
     div.querySelector(".deleteFixtureBtn")?.addEventListener("click", async () => {
       await deleteDoc(doc(db, "fixtures", fixture.id));
       loadGameweekData();
     });
 
-    // Display all predictions only after current player has predicted
+    // Show predictions only if current player has predicted
     const predContainer = div.querySelector(".playersPredictions");
     const allPreds = predictions[fixture.id] || {};
     const res = results[fixture.id];
@@ -338,7 +329,9 @@ async function loadGameweekData() {
     } else {
       predContainer.innerHTML = `<span class="text-gray-400 italic">Submit your prediction to see others.</span>`;
     }
-  });
+  }
+
+  renderLeaderboards(predictions, results, fixtures);
 }
 
 function calculatePoints(pred, res) {
@@ -378,10 +371,6 @@ function renderLeaderboards(predictions, results, fixtures) {
   document.getElementById("leaderboardWeekly").innerHTML = render(weekly);
 }
 
-  });
-
-  renderLeaderboards(predictions, results, fixtures);
-}
 function populatePasswordResetDropdown() {
   document.getElementById("resetUserSelect").innerHTML =
     Object.keys(users).map(u => `<option value="${u}">${u.charAt(0).toUpperCase() + u.slice(1)}</option>`).join("");
