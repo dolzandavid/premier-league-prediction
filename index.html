@@ -367,31 +367,61 @@ function calculatePoints(pred, res) {
 }
 
 function renderLeaderboards(predictions, results, fixtures) {
-  const overall = {};
-  const weekly = {};
+  const overall = {}, exacts = {}, outcomes = {}, counts = {};
+  const weekly = {}, wExacts = {}, wOutcomes = {}, wCounts = {};
 
   for (let f of fixtures) {
     const fid = f.id;
     const res = results[fid];
     if (!res) continue;
     const preds = predictions[fid] || {};
+
     for (let user in preds) {
       const pts = calculatePoints(preds[user], res);
+      const isExact = pts === 5;
+      const isOutcome = pts >= 2;
+
+      // Overall
       overall[user] = (overall[user] || 0) + pts;
+      counts[user] = (counts[user] || 0) + 1;
+      if (isExact) exacts[user] = (exacts[user] || 0) + 1;
+      if (isOutcome) outcomes[user] = (outcomes[user] || 0) + 1;
+
+      // Weekly
       weekly[user] = (weekly[user] || 0) + pts;
+      wCounts[user] = (wCounts[user] || 0) + 1;
+      if (isExact) wExacts[user] = (wExacts[user] || 0) + 1;
+      if (isOutcome) wOutcomes[user] = (wOutcomes[user] || 0) + 1;
     }
   }
 
-  const render = obj =>
+  const render = (points, e = {}, o = {}, c = {}) =>
     `<table class="table-auto border w-full text-sm">
-      <thead><tr><th class="border px-2">Player</th><th class="border px-2">Points</th></tr></thead>
+      <thead>
+        <tr class="bg-gray-200">
+          <th class="border px-2 py-1">Player</th>
+          <th class="border px-2 py-1">Pts</th>
+          <th class="border px-2 py-1">Exact</th>
+          <th class="border px-2 py-1">Outcome</th>
+        </tr>
+      </thead>
       <tbody>
-        ${Object.entries(obj).sort((a,b)=>b[1]-a[1]).map(([u,p]) =>
-          `<tr><td class="border px-2">${u.charAt(0).toUpperCase() + u.slice(1)}</td><td class="border px-2">${p}</td></tr>`).join("")}
-      </tbody></table>`;
+        ${Object.entries(points).sort((a,b)=>b[1]-a[1]).map(([u,p]) => {
+          const ex = e[u] || 0;
+          const ou = o[u] || 0;
+          const total = c[u] || 0;
+          return `<tr class="text-center">
+            <td class="border px-2 py-1">${u.charAt(0).toUpperCase() + u.slice(1)}</td>
+            <td class="border px-2 py-1 font-semibold">${p}</td>
+            <td class="border px-2 py-1">${ex} (${total ? Math.round(ex/total*100) : 0}%)</td>
+            <td class="border px-2 py-1">${ou} (${total ? Math.round(ou/total*100) : 0}%)</td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>`;
 
-  document.getElementById("leaderboardOverall").innerHTML = render(overall);
-  document.getElementById("leaderboardWeekly").innerHTML = render(weekly);
+  document.getElementById("leaderboardOverall").innerHTML = render(overall, exacts, outcomes, counts);
+  document.getElementById("leaderboardWeekly").innerHTML = render(weekly, wExacts, wOutcomes, wCounts);
 }
 
 function populatePasswordResetDropdown() {
@@ -447,7 +477,7 @@ document.addEventListener("click", async (e) => {
       html += `• ${m.home} ${m.gh}-${m.ga} ${m.away} (${m.date})\n`;
     });
   
-    html += `\nSummary:\n-Total matches: ${data.last5.length + (data.summary.wins + data.summary.losses + data.summary.draws - data.last5.length)} \n- ${home} Wins: ${data.summary.wins}\n- Draws: ${data.summary.draws}\n- ${away} Wins: ${data.summary.losses}`;
+    html += `\nSummary:\n- Total matches: ${data.last5.length + (data.summary.wins + data.summary.losses + data.summary.draws - data.last5.length)} \n- ${home} Wins: ${data.summary.wins}\n- Draws: ${data.summary.draws}\n- ${away} Wins: ${data.summary.losses}`;
     html += `\n- ${home} Goals: ${data.summary.goalsFor}\n- ${away} Goals: ${data.summary.goalsAgainst}`;
 
     html += `\n\nBiggest Wins:\n- ${home}: ${data.biggestWin[home] || "–"}\n- ${away}: ${data.biggestWin[away] || "–"}`;
