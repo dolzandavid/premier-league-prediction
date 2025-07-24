@@ -338,21 +338,45 @@ async function loadGameweekData() {
     });
 
     // Show predictions
-    const predDiv = div.querySelector(".playersPredictions");
-    if (pred) {
-      let html = "";
-      const all = predictions[fixture.id] || {};
-      for (let player in all) {
-        const p = all[player];
-        const res = results[fixture.id];
-        const pts = res ? calculatePoints(p, res) : "-";
-        html += `${player.charAt(0).toUpperCase() + player.slice(1)}: ${p.home}:${p.away} (${pts} pts)<br>`;
-      }
-      predDiv.innerHTML = html;
-    } else {
-      predDiv.innerHTML = `<span class="text-gray-400 italic">Submit your prediction to see others.</span>`;
+const predDiv = div.querySelector(".playersPredictions");
+const all = predictions[fixture.id] || {};
+
+if (pred) {
+  if (Object.keys(all).length > 0) {
+    let html = `<table class="mt-2 border w-full text-sm bg-gray-50">
+      <thead class="bg-gray-200">
+        <tr>
+          <th class="border px-2 py-1 text-left">Player</th>
+          <th class="border px-2 py-1 text-center">Prediction</th>
+          <th class="border px-2 py-1 text-center">Points</th>
+        </tr>
+      </thead>
+      <tbody>
+    `;
+
+    for (let player of ["david", "katja", "mark", "jus"]) {
+      const p = all[player];
+      if (!p) continue;
+      const res = results[fixture.id];
+      const pts = res ? calculatePoints(p, res) : "-";
+
+      html += `
+        <tr class="hover:bg-gray-100">
+          <td class="border px-2 py-1">${player.charAt(0).toUpperCase() + player.slice(1)}</td>
+          <td class="border px-2 py-1 text-center">${p.home}:${p.away}</td>
+          <td class="border px-2 py-1 text-center font-semibold ${pts === 5 ? 'text-green-600' : pts >= 2 ? 'text-blue-600' : 'text-gray-500'}">${pts}</td>
+        </tr>`;
     }
+
+    html += `</tbody></table>`;
+    predDiv.innerHTML = html;
+  } else {
+    predDiv.innerHTML = `<span class="text-gray-400 italic">No predictions yet.</span>`;
   }
+} else {
+  predDiv.innerHTML = `<span class="text-gray-400 italic">Submit your prediction to see others.</span>`;
+}
+
 
 // Load all predictions, results, and fixtures from Firestore
 const allPredDocs = await getDocs(collection(db, "predictions"));
@@ -514,6 +538,12 @@ document.addEventListener("click", async (e) => {
     html += `\n- ${home} Goals: ${data.summary.goalsFor}\n- ${away} Goals: ${data.summary.goalsAgainst}`;
 
     html += `\n\nBiggest Wins:\n- ${home}: ${data.biggestWin[home] || "–"}\n- ${away}: ${data.biggestWin[away] || "–"}`;
+
+if (data.streaks) {
+  html += `\n\nLongest Winning Streaks:\n`;
+  html += `- ${home}: ${data.streaks[home]?.count || 0} wins ${data.streaks[home]?.span ? `(${data.streaks[home].span})` : ""}\n`;
+  html += `- ${away}: ${data.streaks[away]?.count || 0} wins ${data.streaks[away]?.span ? `(${data.streaks[away].span})` : ""}`;
+}
 
     content.textContent = html;
   }
