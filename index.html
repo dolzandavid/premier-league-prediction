@@ -355,28 +355,7 @@ div.appendChild(historyBtn);
     }
   }
 
-const allPredDocs = await getDocs(collection(db, "predictions"));
-const allResDocs = await getDocs(collection(db, "results"));
-const allFixDocs = await getDocs(collection(db, "fixtures"));
-
-const allPredictions = {};
-allPredDocs.forEach(doc => {
-  const data = doc.data();
-  for (const fid in data) {
-    if (!allPredictions[fid]) allPredictions[fid] = {};
-    Object.assign(allPredictions[fid], data[fid]);
-  }
-});
-
-const allResults = {};
-allResDocs.forEach(doc => {
-  const data = doc.data();
-  Object.assign(allResults, data);
-});
-
-const allFixtures = allFixDocs.docs.map(d => ({ id: d.id, ...d.data() }));
-
-renderLeaderboards(allPredictions, allResults, allFixtures);
+  renderLeaderboards(predictions, results, fixtures);
 }
 function calculatePoints(pred, res) {
   let pts = 0;
