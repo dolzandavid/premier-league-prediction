@@ -552,8 +552,9 @@ document.addEventListener("click", async (e) => {
 
     // Summary
     const s = data.summary;
-    html += `\nSummary:\n- ${home} Wins: ${s.wins}\n- Draws: ${s.draws}\n- ${away} Wins: ${s.losses}`;
-    html += `\n- ${home} Goals: ${s.goalsFor}\n- ${away} Goals: ${s.goalsAgainst}`;
+    const total = s.wins + s.draws + s.losses;
+html += `\nSummary:\n- Total matches: ${total}\n- ${home} Wins: ${s.wins}\n- Draws: ${s.draws}\n- ${away} Wins: ${s.losses}`;
+html += `\n- ${home} Goals: ${s.goalsFor}\n- ${away} Goals: ${s.goalsAgainst};
 
     // Biggest Wins
     html += `\n\nBiggest Wins:\n- ${home}: ${data.biggestWin?.[home] || "–"}\n- ${away}: ${data.biggestWin?.[away] || "–"}`;
