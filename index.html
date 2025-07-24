@@ -502,32 +502,66 @@ document.getElementById("setDeadlineBtn").onclick = async () => {
   await setDoc(doc(db, "deadlines", currentGameweek), { deadline });
   loadGameweekData();
 };
+
 // Show history modal
+const teamNameMap = {
+  "Man Utd": "Manchester United",
+  "Man City": "Manchester City",
+  "Spurs": "Tottenham Hotspur",
+  "Wolves": "Wolverhampton Wanderers",
+  "Newcastle": "Newcastle United",
+  "West Ham": "West Ham United",
+  "Nott'm Forest": "Nottingham Forest",
+  "Sheff Utd": "Sheffield United",
+  "Leeds": "Leeds United",
+  "Brighton": "Brighton & Hove Albion"
+};
+
+function normalizeTeam(name) {
+  return teamNameMap[name] || name;
+}
+
 document.addEventListener("click", async (e) => {
   if (!e.target.classList.contains("historyBtn")) return;
   const card = e.target.closest(".border.p-3");
-  const home = card.querySelector(".homeTeam").textContent.trim();
-  const away = card.querySelector(".awayTeam").textContent.trim();
+  const rawHome = card.querySelector(".homeTeam").textContent.trim();
+  const rawAway = card.querySelector(".awayTeam").textContent.trim();
+  const home = normalizeTeam(rawHome);
+  const away = normalizeTeam(rawAway);
   const key = `${home} vs ${away}`;
   const snap = await getDoc(doc(db, "history", key));
   const modal = document.getElementById("historyModal");
   const content = document.getElementById("historyContent");
 
   if (!snap.exists()) {
-    content.textContent = `No history found for ${key}`;
+    content.textContent = `No history found for ${home} vs ${away}`;
   } else {
     const data = snap.data();
-    let html = `📊 Head-to-Head: ${key}\n\n`;
+    let html = `📊 Head-to-Head: ${home} vs ${away}\n\n`;
 
+    // Last 5 matches
     html += "Last 5 matches:\n";
-    data.last5.forEach(m => {
-      html += `• ${m.home} ${m.gh}-${m.ga} ${m.away} (${m.date})\n`;
-    });
-  
-    html += `\nSummary:\n- Total matches: ${data.last5.length + (data.summary.wins + data.summary.losses + data.summary.draws - data.last5.length)} \n- ${home} Wins: ${data.summary.wins}\n- Draws: ${data.summary.draws}\n- ${away} Wins: ${data.summary.losses}`;
-    html += `\n- ${home} Goals: ${data.summary.goalsFor}\n- ${away} Goals: ${data.summary.goalsAgainst}`;
+    if (data.last5?.length) {
+      data.last5.forEach(m => {
+        const season = m.season || "–";
+        html += `• ${m.home} ${m.gh}-${m.ga} ${m.away} (${season})\n`;
+      });
+    } else {
+      html += "No recent matches found.\n";
+    }
 
-    html += `\n\nBiggest Wins:\n- ${home}: ${data.biggestWin[home] || "–"}\n- ${away}: ${data.biggestWin[away] || "–"}`;
+    // Summary
+    const s = data.summary;
+    html += `\nSummary:\n- ${home} Wins: ${s.wins}\n- Draws: ${s.draws}\n- ${away} Wins: ${s.losses}`;
+    html += `\n- ${home} Goals: ${s.goalsFor}\n- ${away} Goals: ${s.goalsAgainst}`;
+
+    // Biggest Wins
+    html += `\n\nBiggest Wins:\n- ${home}: ${data.biggestWin?.[home] || "–"}\n- ${away}: ${data.biggestWin?.[away] || "–"}`;
+
+    // Longest Streaks
+    const hs = data.streaks?.[home];
+    const as = data.streaks?.[away];
+    html += `\n\nLongest Winning Streaks:\n- ${home}: ${hs?.count || 0} (${hs?.span || "–"})\n- ${away}: ${as?.count || 0} (${as?.span || "–"})`;
 
     content.textContent = html;
   }
