@@ -376,7 +376,14 @@ async function loadGameweekData() {
 
   const allFixtures = allFixDocs.docs.map(d => ({ id: d.id, ...d.data() }));
 
-  renderLeaderboards(allPredictions, allResults, allFixtures);
+renderLeaderboards(
+  allPredictions,
+  allResults,
+  allFixtures,
+  predictions,   // for current week
+  results,       // for current week
+  fixtures       // for current week
+);
 }
 
 function calculatePoints(pred, res) {
@@ -388,28 +395,25 @@ function calculatePoints(pred, res) {
   return pts;
 }
 
-function renderLeaderboards(predictions, results, fixtures) {
+function renderLeaderboards(
+  allPredictions, allResults, allFixtures,
+  weeklyPredictions = {}, weeklyResults = {}, weeklyFixtures = []
+) {  
+  
   const overall = {}, exacts = {}, outcomes = {}, counts = {};
   const weekly = {}, wExacts = {}, wOutcomes = {}, wCounts = {};
 
-  for (let f of fixtures) {
+  for (let f of weeklyFixtures) {
     const fid = f.id;
-    const res = results[fid];
+    const res = weeklyResults[fid];
     if (!res) continue;
-    const preds = predictions[fid] || {};
+    const preds = weeklyPredictions[fid] || {};
 
     for (let user in preds) {
       const pts = calculatePoints(preds[user], res);
       const isExact = pts === 5;
       const isOutcome = pts >= 2;
 
-      // Overall
-      overall[user] = (overall[user] || 0) + pts;
-      counts[user] = (counts[user] || 0) + 1;
-      if (isExact) exacts[user] = (exacts[user] || 0) + 1;
-      if (isOutcome) outcomes[user] = (outcomes[user] || 0) + 1;
-
-      // Weekly
       weekly[user] = (weekly[user] || 0) + pts;
       wCounts[user] = (wCounts[user] || 0) + 1;
       if (isExact) wExacts[user] = (wExacts[user] || 0) + 1;
