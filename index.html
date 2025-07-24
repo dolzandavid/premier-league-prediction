@@ -354,37 +354,37 @@ async function loadGameweekData() {
     }
   }
 
-  // Load all data for leaderboard rendering
-  const allPredDocs = await getDocs(collection(db, "predictions"));
-  const allResDocs = await getDocs(collection(db, "results"));
-  const allFixDocs = await getDocs(collection(db, "fixtures"));
+// Load all predictions, results, and fixtures from Firestore
+const allPredDocs = await getDocs(collection(db, "predictions"));
+const allResDocs = await getDocs(collection(db, "results"));
+const allFixDocs = await getDocs(collection(db, "fixtures"));
 
-  const allPredictions = {};
-  allPredDocs.forEach(doc => {
-    const data = doc.data();
-    for (const fid in data) {
-      if (!allPredictions[fid]) allPredictions[fid] = {};
-      Object.assign(allPredictions[fid], data[fid]);
+// Merge all predictions from multiple gameweeks
+const allPredictions = {};
+allPredDocs.forEach(doc => {
+  const data = doc.data(); // e.g. { fixtureId1: { user1: {...}, user2: {...} }, fixtureId2: { ... } }
+  for (const fid in data) {
+    if (!allPredictions[fid]) allPredictions[fid] = {};
+    for (const player in data[fid]) {
+      allPredictions[fid][player] = data[fid][player];
     }
-  });
+  }
+});
 
-  const allResults = {};
-  allResDocs.forEach(doc => {
-    const data = doc.data();
-    Object.assign(allResults, data);
-  });
+// Merge all results
+const allResults = {};
+allResDocs.forEach(doc => {
+  const data = doc.data(); // e.g. { fixtureId1: {home: 2, away: 1}, ... }
+  Object.assign(allResults, data);
+});
 
-  const allFixtures = allFixDocs.docs.map(d => ({ id: d.id, ...d.data() }));
+// Gather all fixtures
+const allFixtures = allFixDocs.docs.map(d => ({ id: d.id, ...d.data() }));
 
-renderLeaderboards(
-  allPredictions,
-  allResults,
-  allFixtures,
-  predictions,   // for current week
-  results,       // for current week
-  fixtures       // for current week
-);
+// Now render the leaderboard
+renderLeaderboards(allPredictions, allResults, allFixtures);
 }
+
 
 function calculatePoints(pred, res) {
   let pts = 0;
@@ -395,29 +395,36 @@ function calculatePoints(pred, res) {
   return pts;
 }
 
-function renderLeaderboards(
-  allPredictions, allResults, allFixtures,
-  weeklyPredictions = {}, weeklyResults = {}, weeklyFixtures = []
-) {  
-  
+function renderLeaderboards(allPredictions, allResults, allFixtures) {
   const overall = {}, exacts = {}, outcomes = {}, counts = {};
   const weekly = {}, wExacts = {}, wOutcomes = {}, wCounts = {};
 
-  for (let f of weeklyFixtures) {
-    const fid = f.id;
-    const res = weeklyResults[fid];
+  for (let fixture of allFixtures) {
+    const fid = fixture.id;
+    const res = allResults[fid];
     if (!res) continue;
-    const preds = weeklyPredictions[fid] || {};
+    const preds = allPredictions[fid] || {};
+
+    const isCurrentWeek = fixture.gameweek == currentGameweek;
 
     for (let user in preds) {
       const pts = calculatePoints(preds[user], res);
       const isExact = pts === 5;
       const isOutcome = pts >= 2;
 
-      weekly[user] = (weekly[user] || 0) + pts;
-      wCounts[user] = (wCounts[user] || 0) + 1;
-      if (isExact) wExacts[user] = (wExacts[user] || 0) + 1;
-      if (isOutcome) wOutcomes[user] = (wOutcomes[user] || 0) + 1;
+      // Overall leaderboard
+      overall[user] = (overall[user] || 0) + pts;
+      counts[user] = (counts[user] || 0) + 1;
+      if (isExact) exacts[user] = (exacts[user] || 0) + 1;
+      if (isOutcome) outcomes[user] = (outcomes[user] || 0) + 1;
+
+      // Weekly leaderboard (only current gameweek)
+      if (isCurrentWeek) {
+        weekly[user] = (weekly[user] || 0) + pts;
+        wCounts[user] = (wCounts[user] || 0) + 1;
+        if (isExact) wExacts[user] = (wExacts[user] || 0) + 1;
+        if (isOutcome) wOutcomes[user] = (wOutcomes[user] || 0) + 1;
+      }
     }
   }
 
