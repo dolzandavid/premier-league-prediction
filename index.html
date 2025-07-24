@@ -180,11 +180,10 @@ loginBtn.onclick = async () => {
 logoutBtn.onclick = () => location.reload();
 
 async function loadGameweeks() {
-  const fixtureDocs = await getDocs(collection(db, "fixtures"));
+const fixtureDocs = await getDocs(collection(db, "fixtures"));
+const weeks = [...new Set(fixtureDocs.docs.map(d => d.data().gameweek))]
+  .filter(Boolean).sort((a, b) => +a - +b);
   const deadlineDocs = await getDocs(collection(db, "deadlines"));
-
-  const weeks = [...new Set(fixtureDocs.docs.map(d => d.id.split("_")[0]))]
-    .filter(Boolean).sort((a, b) => +a - +b);
 
   deadlinesByWeek = {};
   deadlineDocs.forEach(docSnap => {
@@ -223,14 +222,15 @@ async function loadGameweekData() {
   const fixturesContainer = document.getElementById("fixturesContainer");
   fixturesContainer.innerHTML = "";
 
-  const fixtureDocs = await getDocs(collection(db, "fixtures"));
+  import { query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const q = query(collection(db, "fixtures"), where("gameweek", "==", currentGameweek));
+const fixtureDocs = await getDocs(q);
+const fixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
+
   const resultsDoc = await getDoc(doc(db, "results", currentGameweek));
   const predictionsDoc = await getDoc(doc(db, "predictions", currentGameweek));
   const deadlineDoc = await getDoc(doc(db, "deadlines", currentGameweek));
 
-  const fixtures = fixtureDocs.docs
-    .filter(d => d.id.startsWith(currentGameweek + "_"))
-    .map(d => ({ id: d.id, ...d.data() }));
 
   const results = resultsDoc.exists() ? resultsDoc.data() : {};
   const predictions = predictionsDoc.exists() ? predictionsDoc.data() : {};
@@ -443,7 +443,7 @@ document.getElementById("addFixtureBtn").onclick = async () => {
   const away = document.getElementById("newAwayTeam").value.trim();
   if (!home || !away) return alert("Enter both teams");
   const id = `${currentGameweek}_${home}_${away}_${Date.now()}`;
-  await setDoc(doc(db, "fixtures", id), { home, away });
+  await setDoc(doc(db, "fixtures", id), { home, away, gameweek: currentGameweek });
   document.getElementById("newHomeTeam").value = "";
   document.getElementById("newAwayTeam").value = "";
   loadGameweekData();
