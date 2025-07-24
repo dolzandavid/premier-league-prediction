@@ -355,7 +355,21 @@ div.appendChild(historyBtn);
     }
   }
 
-  renderLeaderboards(predictions, results, fixtures);
+  // Load all predictions and results for overall leaderboard
+const allPredDocs = await getDocs(collection(db, "predictions"));
+const allResDocs = await getDocs(collection(db, "results"));
+const allFixDocs = await getDocs(collection(db, "fixtures"));
+
+const allPredictions = {};
+allPredDocs.forEach(doc => allPredictions[doc.id] = doc.data());
+
+const allResults = {};
+allResDocs.forEach(doc => allResults[doc.id] = doc.data());
+
+const allFixtures = allFixDocs.docs.map(d => ({ id: d.id, ...d.data() }));
+
+renderLeaderboards(allPredictions, allResults, allFixtures);
+
 }
 function calculatePoints(pred, res) {
   let pts = 0;
