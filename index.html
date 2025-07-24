@@ -101,7 +101,7 @@
   </div>
   <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyA2WG0LUwLCDqmylgezCZ0aH5Q8vTaXTKU",
@@ -222,15 +222,13 @@ async function loadGameweekData() {
   const fixturesContainer = document.getElementById("fixturesContainer");
   fixturesContainer.innerHTML = "";
 
-  import { query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-const q = query(collection(db, "fixtures"), where("gameweek", "==", currentGameweek));
-const fixtureDocs = await getDocs(q);
-const fixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
+  const q = query(collection(db, "fixtures"), where("gameweek", "==", currentGameweek));
+  const fixtureDocs = await getDocs(q);
+  const fixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
 
   const resultsDoc = await getDoc(doc(db, "results", currentGameweek));
   const predictionsDoc = await getDoc(doc(db, "predictions", currentGameweek));
   const deadlineDoc = await getDoc(doc(db, "deadlines", currentGameweek));
-
 
   const results = resultsDoc.exists() ? resultsDoc.data() : {};
   const predictions = predictionsDoc.exists() ? predictionsDoc.data() : {};
@@ -285,14 +283,15 @@ const fixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
 
       <div class="text-sm mt-2 playersPredictions"></div>
     `;
-const historyBtn = document.createElement('button');
-historyBtn.textContent = "Fixture History";
-historyBtn.className = "historyBtn bg-yellow-100 hover:bg-yellow-200 px-2 py-1 rounded text-sm ml-2";
-div.appendChild(historyBtn);
+
+    const historyBtn = document.createElement("button");
+    historyBtn.textContent = "Fixture History";
+    historyBtn.className = "historyBtn bg-yellow-100 hover:bg-yellow-200 px-2 py-1 rounded text-sm ml-2";
+    div.appendChild(historyBtn);
 
     fixturesContainer.appendChild(div);
 
-    // --- Event Listeners ---
+    // Event Listeners
     div.querySelector(".savePred")?.addEventListener("click", async () => {
       const h = div.querySelector(".predHome").value;
       const a = div.querySelector(".predAway").value;
@@ -328,7 +327,7 @@ div.appendChild(historyBtn);
       const newHome = prompt("New home team name:", fixture.home);
       const newAway = prompt("New away team name:", fixture.away);
       if (newHome && newAway) {
-        await setDoc(doc(db, "fixtures", fixture.id), { home: newHome, away: newAway });
+        await setDoc(doc(db, "fixtures", fixture.id), { home: newHome, away: newAway, gameweek: currentGameweek });
         loadGameweekData();
       }
     });
@@ -355,8 +354,31 @@ div.appendChild(historyBtn);
     }
   }
 
-  renderLeaderboards(predictions, results, fixtures);
+  // Load all data for leaderboard rendering
+  const allPredDocs = await getDocs(collection(db, "predictions"));
+  const allResDocs = await getDocs(collection(db, "results"));
+  const allFixDocs = await getDocs(collection(db, "fixtures"));
+
+  const allPredictions = {};
+  allPredDocs.forEach(doc => {
+    const data = doc.data();
+    for (const fid in data) {
+      if (!allPredictions[fid]) allPredictions[fid] = {};
+      Object.assign(allPredictions[fid], data[fid]);
+    }
+  });
+
+  const allResults = {};
+  allResDocs.forEach(doc => {
+    const data = doc.data();
+    Object.assign(allResults, data);
+  });
+
+  const allFixtures = allFixDocs.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  renderLeaderboards(allPredictions, allResults, allFixtures);
 }
+
 function calculatePoints(pred, res) {
   let pts = 0;
   if (pred.home === res.home) pts++;
