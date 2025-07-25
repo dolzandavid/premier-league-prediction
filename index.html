@@ -256,15 +256,9 @@ async function loadGameweekData() {
 div.innerHTML = `
   <div class="flex justify-between items-center">
     <div class="font-semibold flex items-center">
-<span class="homeTeam flex items-center">
-  <img src="${getLogoUrl(fixture.home)}" alt="${fixture.home}" class="w-5 h-5 mr-1 inline" />
-  ${fixture.home}
-</span>
-<span class="mx-1">vs</span>
-<span class="awayTeam flex items-center">
-  <img src="${getLogoUrl(fixture.away)}" alt="${fixture.away}" class="w-5 h-5 mr-1 inline" />
-  ${fixture.away}
-</span>
+      <span class="homeTeam">${fixture.home}</span>
+      <span class="mx-1">vs</span>
+      <span class="awayTeam">${fixture.away}</span>
       <button class="historyBtn bg-yellow-100 hover:bg-yellow-200 px-2 py-1 rounded text-sm ml-2">
         Fixture History
       </button>
@@ -276,41 +270,45 @@ div.innerHTML = `
       </div>` : ""}
   </div>
 
-<div>
-  <label class="text-sm block">Your Prediction:</label>
-  ${
-    isLocked && !pred
-      ? `<span class="text-gray-500 italic">No prediction submitted</span>`
-      : `
-      <input type="number" min="0" class="border p-1 w-12 predHome" value="${pred?.home ?? ""}" ${isLocked ? "disabled" : ""}>
-      :
-      <input type="number" min="0" class="border p-1 w-12 predAway" value="${pred?.away ?? ""}" ${isLocked ? "disabled" : ""}>
-      ${!isLocked ? `<button class="savePred bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 ml-2 rounded text-sm">Save</button>` : ""}
-      ${!isLocked && pred ? `<button class="deletePred bg-red-500 hover:bg-red-600 text-white px-2 py-1 ml-2 rounded text-sm">Delete</button>` : ""}
-      `
-  }
-</div>
+  <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+    <div>
+      <label class="text-sm block">Your Prediction:</label>
+      ${
+        isLocked
+          ? pred
+            ? `<span class="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded">${pred.home}:${pred.away}</span>`
+            : `<span class="text-red-500 italic">Not submitted</span>`
+          : `
+        <input type="number" min="0" class="border p-1 w-12 predHome" value="${pred?.home ?? ""}">
+        :
+        <input type="number" min="0" class="border p-1 w-12 predAway" value="${pred?.away ?? ""}">
+        <button class="savePred bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 ml-2 rounded text-sm">Save</button>
+        ${pred ? `<button class="deletePred bg-red-500 hover:bg-red-600 text-white px-2 py-1 ml-2 rounded text-sm">Delete</button>` : ""}`
+      }
+    </div>
 
-<div>
-  ${
-    result
-    ? `<label class="text-sm block">Result:</label>
-       <div class="bg-gray-200 border px-2 py-1 inline-block rounded">${result.home} : ${result.away}</div>
-       ${currentUser === "david" ? `
-         <button class="deleteRes bg-red-500 hover:bg-red-600 text-white px-2 py-1 ml-2 rounded text-sm">Delete</button>
-       ` : ""}`
-    : currentUser === "david"
-      ? `<label class="text-sm block">Result:</label>
-         <input type="number" min="0" class="border p-1 w-12 resHome" value="">
-         :
-         <input type="number" min="0" class="border p-1 w-12 resAway" value="">
-         <button class="saveRes bg-green-500 hover:bg-green-600 text-white px-2 py-1 ml-2 rounded text-sm">Save</button>`
-      : ""
-  }
-</div>
+    <div>
+      ${
+        result
+          ? `<label class="text-sm block">Result:</label>
+             <span class="inline-block bg-green-100 text-green-800 px-2 py-1 rounded">${result.home}:${result.away}</span>
+             ${currentUser === "david" ? `
+                <button class="deleteRes bg-red-500 hover:bg-red-600 text-white px-2 py-1 ml-2 rounded text-sm">Delete</button>
+              ` : ""}
+            `
+          : currentUser === "david"
+            ? `<label class="text-sm block">Result:</label>
+               <input type="number" min="0" class="border p-1 w-12 resHome" value="">
+               :
+               <input type="number" min="0" class="border p-1 w-12 resAway" value="">
+               <button class="saveRes bg-green-500 hover:bg-green-600 text-white px-2 py-1 ml-2 rounded text-sm">Save</button>
+            `
+            : ""
+      }
+    </div>
   </div>
 
-  <div class="text-sm mt-2 playersPredictions"></div>
+  <div class="text-sm mt-4 playersPredictions"></div>
 `;
 
     fixturesContainer.appendChild(div);
@@ -375,19 +373,52 @@ div.innerHTML = `
     // Show predictions
     const predDiv = div.querySelector(".playersPredictions");
 const all = predictions[fixture.id] || {};
-if (pred) {
-  let html = `
-    <div class="mt-3 border border-gray-300 rounded overflow-hidden">
-      <table class="table-auto w-full text-sm">
-        <thead class="bg-gray-100 text-left">
-          <tr>
-            <th class="px-2 py-1">Player</th>
-            <th class="px-2 py-1">Prediction</th>
-            <th class="px-2 py-1">Points</th>
-          </tr>
-        </thead>
-        <tbody>
-  `;
+const all = predictions[fixture.id] || {};
+const res = results[fixture.id];
+
+let html = `
+  <div class="mt-3 border border-gray-300 rounded overflow-hidden">
+    <table class="table-auto w-full text-sm">
+      <thead class="bg-gray-100 text-left">
+        <tr>
+          <th class="px-2 py-1">Player</th>
+          <th class="px-2 py-1">Prediction</th>
+          <th class="px-2 py-1">Points</th>
+        </tr>
+      </thead>
+      <tbody>
+`;
+
+for (let player in all) {
+  const p = all[player];
+  let pts = res ? calculatePoints(p, res) : "-";
+
+  let ptsBgClass = "bg-gray-400";
+  if (typeof pts === "number") {
+    if (pts === 5) ptsBgClass = "bg-green-600";
+    else if (pts >= 2) ptsBgClass = "bg-yellow-500";
+    else ptsBgClass = "bg-red-500";
+  }
+
+  html += `
+    <tr class="hover:bg-gray-50">
+      <td class="border-t px-2 py-1">${player.charAt(0).toUpperCase() + player.slice(1)}</td>
+      <td class="border-t px-2 py-1">${p ? `${p.home}:${p.away}` : `<span class="text-red-500 italic">Not submitted</span>`}</td>
+      <td class="border-t px-2 py-1">
+        <span class="px-2 py-1 rounded-full text-white text-xs ${ptsBgClass}">
+          ${pts}
+        </span>
+      </td>
+    </tr>`;
+}
+
+html += `
+    </tbody>
+  </table>
+</div>
+`;
+
+predDiv.innerHTML = html;
 for (let player in all) {
   const p = all[player];
   const res = results[fixture.id];
