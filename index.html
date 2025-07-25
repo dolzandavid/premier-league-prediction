@@ -379,26 +379,29 @@ if (pred) {
         </thead>
         <tbody>
   `;
-  for (let player in all) {
-    const p = all[player];
-    const res = results[fixture.id];
-    let pts = res ? calculatePoints(p, res) : "-";
+for (let player in all) {
+  const p = all[player];
+  const res = results[fixture.id];
+  let pts = res ? calculatePoints(p, res) : "-";
 
-    // Apply color class
-    let ptsClass = "text-gray-600";
-    if (typeof pts === "number") {
-      if (pts === 5) ptsClass = "text-green-600 font-bold";
-      else if (pts >= 2) ptsClass = "text-yellow-600 font-semibold";
-      else ptsClass = "text-red-600 font-medium";
-    }
-
-    html += `
-      <tr class="hover:bg-gray-50">
-        <td class="border-t px-2 py-1">${player.charAt(0).toUpperCase() + player.slice(1)}</td>
-        <td class="border-t px-2 py-1">${p.home}:${p.away}</td>
-        <td class="border-t px-2 py-1 ${ptsClass}">${pts}</td>
-      </tr>`;
+  let ptsBgClass = "bg-gray-400";
+  if (typeof pts === "number") {
+    if (pts === 5) ptsBgClass = "bg-green-600";
+    else if (pts >= 2) ptsBgClass = "bg-yellow-500";
+    else ptsBgClass = "bg-red-500";
   }
+
+  html += `
+    <tr class="hover:bg-gray-50">
+      <td class="border-t px-2 py-1">${player.charAt(0).toUpperCase() + player.slice(1)}</td>
+      <td class="border-t px-2 py-1">${p.home}:${p.away}</td>
+      <td class="border-t px-2 py-1">
+        <span class="px-2 py-1 rounded-full text-white text-xs ${ptsBgClass}">
+          ${pts}
+        </span>
+      </td>
+    </tr>`;
+}
   html += `
         </tbody>
       </table>
