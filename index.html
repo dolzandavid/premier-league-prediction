@@ -253,16 +253,16 @@ async function loadGameweekData() {
     const div = document.createElement("div");
     div.className = "border p-3 my-2 bg-white rounded shadow";
 
-    div.innerHTML = `
-      <div class="flex justify-between items-center">
-<div class="font-semibold flex items-center space-x-2">
-  <img src="${getLogoUrl(fixture.home)}" alt="${fixture.home}" class="w-5 h-5 inline">
-  <span class="homeTeam">${fixture.home}</span>
-  <span>vs</span>
-  <img src="${getLogoUrl(fixture.away)}" alt="${fixture.away}" class="w-5 h-5 inline">
-  <span class="awayTeam">${fixture.away}</span>
-</div>
-
+div.innerHTML = `
+  <div class="flex justify-between items-center">
+    <div class="font-semibold flex items-center">
+      <span class="homeTeam">${fixture.home}</span>
+      <span class="mx-1">vs</span>
+      <span class="awayTeam">${fixture.away}</span>
+      <button class="historyBtn bg-yellow-100 hover:bg-yellow-200 px-2 py-1 rounded text-sm ml-2">
+        Fixture History
+      </button>
+    </div>
         ${currentUser === "david" ? `
           <div>
             <button class="editBtn bg-blue-100 hover:bg-blue-200 px-2 py-1 rounded text-sm">Edit</button>
@@ -298,11 +298,6 @@ async function loadGameweekData() {
 
       <div class="text-sm mt-2 playersPredictions"></div>
     `;
-
-    const historyBtn = document.createElement("button");
-    historyBtn.textContent = "Fixture History";
-    historyBtn.className = "historyBtn bg-yellow-100 hover:bg-yellow-200 px-2 py-1 rounded text-sm ml-2";
-    div.appendChild(historyBtn);
 
     fixturesContainer.appendChild(div);
 
