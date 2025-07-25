@@ -225,61 +225,25 @@ document.getElementById("gameweekSelect").onchange = (e) => {
   loadGameweekData();
 };
 
-function getCachedData(type, gameweek) {
-  try {
-    const raw = localStorage.getItem(`${type}_${gameweek}`);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function setCachedData(type, gameweek, data) {
-  try {
-    localStorage.setItem(`${type}_${gameweek}`, JSON.stringify(data));
-  } catch {}
-}
-
 async function loadGameweekData() {
   const fixturesContainer = document.getElementById("fixturesContainer");
   fixturesContainer.innerHTML = "";
 
-  let fixtures = getCachedData("fixtures", currentGameweek);
-  let results = getCachedData("results", currentGameweek);
-  let predictions = getCachedData("predictions", currentGameweek);
+  const q = query(collection(db, "fixtures"), where("gameweek", "==", currentGameweek));
+  const fixtureDocs = await getDocs(q);
+  const fixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
 
-  if (!fixtures) {
-    const q = query(collection(db, "fixtures"), where("gameweek", "==", currentGameweek));
-    const fixtureDocs = await getDocs(q);
-    fixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
-    setCachedData("fixtures", currentGameweek, fixtures);
-  }
-
-  if (!results) {
-    const resultsDoc = await getDoc(doc(db, "results", currentGameweek));
-    results = resultsDoc.exists() ? resultsDoc.data() : {};
-    setCachedData("results", currentGameweek, results);
-  }
-
-  if (!predictions) {
-    const predictionsDoc = await getDoc(doc(db, "predictions", currentGameweek));
-    predictions = predictionsDoc.exists() ? predictionsDoc.data() : {};
-    setCachedData("predictions", currentGameweek, predictions);
-  }
-
+  const resultsDoc = await getDoc(doc(db, "results", currentGameweek));
+  const predictionsDoc = await getDoc(doc(db, "predictions", currentGameweek));
   const deadlineDoc = await getDoc(doc(db, "deadlines", currentGameweek));
+
+  const results = resultsDoc.exists() ? resultsDoc.data() : {};
+  const predictions = predictionsDoc.exists() ? predictionsDoc.data() : {};
   const deadline = deadlineDoc.exists() ? deadlineDoc.data()?.deadline : null;
 
   document.getElementById("gameweekDeadline").textContent = deadline
     ? `Deadline: ${new Date(deadline).toLocaleString()}`
     : "";
-
-  renderGameweek(fixtures, results, predictions);
-}
-
-function renderGameweek(fixtures, results, predictions) {
-  const fixturesContainer = document.getElementById("fixturesContainer");
-  fixturesContainer.innerHTML = "";
 
   for (const fixture of fixtures) {
     const result = results[fixture.id];
@@ -472,11 +436,9 @@ allResDocs.forEach(doc => {
 // Gather all fixtures
 const allFixtures = allFixDocs.docs.map(d => ({ id: d.id, ...d.data() }));
 
-
-  // Leaderboard re-render remains at end of loadGameweekData
-  renderLeaderboards(predictions, results, fixtures);
+// Now render the leaderboard
+renderLeaderboards(allPredictions, allResults, allFixtures);
 }
-
 
 
 function calculatePoints(pred, res) {
