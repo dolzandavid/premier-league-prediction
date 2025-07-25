@@ -256,48 +256,63 @@ async function loadGameweekData() {
 div.innerHTML = `
   <div class="flex justify-between items-center">
     <div class="font-semibold flex items-center">
-      <span class="homeTeam">${fixture.home}</span>
-      <span class="mx-1">vs</span>
-      <span class="awayTeam">${fixture.away}</span>
+<span class="homeTeam flex items-center">
+  <img src="${getLogoUrl(fixture.home)}" alt="${fixture.home}" class="w-5 h-5 mr-1 inline" />
+  ${fixture.home}
+</span>
+<span class="mx-1">vs</span>
+<span class="awayTeam flex items-center">
+  <img src="${getLogoUrl(fixture.away)}" alt="${fixture.away}" class="w-5 h-5 mr-1 inline" />
+  ${fixture.away}
+</span>
       <button class="historyBtn bg-yellow-100 hover:bg-yellow-200 px-2 py-1 rounded text-sm ml-2">
         Fixture History
       </button>
     </div>
-        ${currentUser === "david" ? `
-          <div>
-            <button class="editBtn bg-blue-100 hover:bg-blue-200 px-2 py-1 rounded text-sm">Edit</button>
-            <button class="deleteFixtureBtn bg-red-100 hover:bg-red-200 px-2 py-1 rounded text-sm">Delete</button>
-          </div>` : ""}
-      </div>
+    ${currentUser === "david" ? `
+      <div>
+        <button class="editBtn bg-blue-100 hover:bg-blue-200 px-2 py-1 rounded text-sm">Edit</button>
+        <button class="deleteFixtureBtn bg-red-100 hover:bg-red-200 px-2 py-1 rounded text-sm">Delete</button>
+      </div>` : ""}
+  </div>
 
-      <div class="mt-2 flex space-x-4">
-        <div>
-          <label class="text-sm block">Your Prediction:</label>
-          <input type="number" min="0" class="border p-1 w-12 predHome" value="${pred?.home ?? ""}" ${isLocked ? "disabled" : ""}>
-          :
-          <input type="number" min="0" class="border p-1 w-12 predAway" value="${pred?.away ?? ""}" ${isLocked ? "disabled" : ""}>
-          ${!isLocked ? `<button class="savePred bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 ml-2 rounded text-sm">Save</button>` : ""}
-          ${!isLocked && pred ? `<button class="deletePred bg-red-500 hover:bg-red-600 text-white px-2 py-1 ml-2 rounded text-sm">Delete</button>` : ""}
-        </div>
+  <div class="mt-2 flex space-x-4">
+    <div>
+      <label class="text-sm block">Your Prediction:</label>
+      ${
+        isLocked && pred
+        ? `<div class="bg-blue-100 border px-2 py-1 inline-block rounded">${pred.home} : ${pred.away}</div>`
+        : `
+        <input type="number" min="0" class="border p-1 w-12 predHome" value="${pred?.home ?? ""}" ${isLocked ? "disabled" : ""}>
+        :
+        <input type="number" min="0" class="border p-1 w-12 predAway" value="${pred?.away ?? ""}" ${isLocked ? "disabled" : ""}>
+        ${!isLocked ? `<button class="savePred bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 ml-2 rounded text-sm">Save</button>` : ""}
+        ${!isLocked && pred ? `<button class="deletePred bg-red-500 hover:bg-red-600 text-white px-2 py-1 ml-2 rounded text-sm">Delete</button>` : ""}
+        `
+      }
+    </div>
 
-        <div>
-          ${
-            currentUser === "david" || result
-              ? `<label class="text-sm block">Result:</label>
-                <input type="number" min="0" class="border p-1 w-12 resHome" value="${result?.home ?? ""}" ${currentUser !== "david" ? "disabled" : ""}>
-                :
-                <input type="number" min="0" class="border p-1 w-12 resAway" value="${result?.away ?? ""}" ${currentUser !== "david" ? "disabled" : ""}>
-                ${currentUser === "david" ? `
-  <button class="saveRes bg-green-500 hover:bg-green-600 text-white px-2 py-1 ml-2 rounded text-sm">Save</button>
-  ${result ? `<button class="deleteRes bg-red-500 hover:bg-red-600 text-white px-2 py-1 ml-2 rounded text-sm">Delete</button>` : ""}
-` : ""}`
-              : ""
-          }
-        </div>
-      </div>
+<div>
+  ${
+    result
+    ? `<label class="text-sm block">Result:</label>
+       <div class="bg-gray-200 border px-2 py-1 inline-block rounded">${result.home} : ${result.away}</div>
+       ${currentUser === "david" ? `
+         <button class="deleteRes bg-red-500 hover:bg-red-600 text-white px-2 py-1 ml-2 rounded text-sm">Delete</button>
+       ` : ""}`
+    : currentUser === "david"
+      ? `<label class="text-sm block">Result:</label>
+         <input type="number" min="0" class="border p-1 w-12 resHome" value="">
+         :
+         <input type="number" min="0" class="border p-1 w-12 resAway" value="">
+         <button class="saveRes bg-green-500 hover:bg-green-600 text-white px-2 py-1 ml-2 rounded text-sm">Save</button>`
+      : ""
+  }
+</div>
+  </div>
 
-      <div class="text-sm mt-2 playersPredictions"></div>
-    `;
+  <div class="text-sm mt-2 playersPredictions"></div>
+`;
 
     fixturesContainer.appendChild(div);
 
