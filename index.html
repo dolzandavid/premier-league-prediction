@@ -248,9 +248,13 @@ async function loadGameweekData() {
 
     div.innerHTML = `
       <div class="flex justify-between items-center">
-        <div class="font-semibold">
-          <span class="homeTeam">${fixture.home}</span> vs <span class="awayTeam">${fixture.away}</span>
-        </div>
+<div class="font-semibold flex items-center space-x-2">
+  <img src="logos/${fixture.home.toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/ +/g, '-').replace('&', 'and')}.png" alt="${fixture.home}" class="w-6 h-6 inline">
+  <span class="homeTeam">${fixture.home}</span>
+  <span>vs</span>
+  <img src="logos/${fixture.away.toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/ +/g, '-').replace('&', 'and')}.png" alt="${fixture.away}" class="w-6 h-6 inline">
+  <span class="awayTeam">${fixture.away}</span>
+</div>
         ${currentUser === "david" ? `
           <div>
             <button class="editBtn bg-blue-100 hover:bg-blue-200 px-2 py-1 rounded text-sm">Edit</button>
