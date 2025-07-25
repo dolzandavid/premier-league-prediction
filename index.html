@@ -577,7 +577,8 @@ document.addEventListener("click", async (e) => {
     const as = data.streaks?.[away];
     html += `\n\nLongest Winning Streaks:\n- ${home}: ${hs?.count || 0} (${hs?.span || "–"})\n- ${away}: ${as?.count || 0} (${as?.span || "–"})`;
 
-    content.textContent = html;
+    content.innerHTML = html;
+
   }
 
   modal.classList.remove("hidden");
