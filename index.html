@@ -179,6 +179,13 @@ loginBtn.onclick = async () => {
 
 logoutBtn.onclick = () => location.reload();
 
+function getLogoUrl(teamName) {
+  return `logos/${teamName
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, "")  // remove punctuation like apostrophes
+    .replace(/\s+/g, "-")}.png`; // replace spaces with dashes
+}
+
 async function loadGameweeks() {
 const fixtureDocs = await getDocs(collection(db, "fixtures"));
 const weeks = [...new Set(fixtureDocs.docs.map(d => d.data().gameweek))]
@@ -249,12 +256,13 @@ async function loadGameweekData() {
     div.innerHTML = `
       <div class="flex justify-between items-center">
 <div class="font-semibold flex items-center space-x-2">
-  <img src="logos/${fixture.home.toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/ +/g, '-').replace('&', 'and')}.png" alt="${fixture.home}" class="w-6 h-6 inline">
+  <img src="${getLogoUrl(fixture.home)}" alt="${fixture.home}" class="w-5 h-5 inline">
   <span class="homeTeam">${fixture.home}</span>
   <span>vs</span>
-  <img src="logos/${fixture.away.toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/ +/g, '-').replace('&', 'and')}.png" alt="${fixture.away}" class="w-6 h-6 inline">
+  <img src="${getLogoUrl(fixture.away)}" alt="${fixture.away}" class="w-5 h-5 inline">
   <span class="awayTeam">${fixture.away}</span>
 </div>
+
         ${currentUser === "david" ? `
           <div>
             <button class="editBtn bg-blue-100 hover:bg-blue-200 px-2 py-1 rounded text-sm">Edit</button>
