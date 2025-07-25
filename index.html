@@ -549,8 +549,7 @@ document.addEventListener("click", async (e) => {
     content.textContent = `No history found for ${home} vs ${away}`;
   } else {
     const data = snap.data();
- let html = `📊 Head-to-Head:\n<img src="${getLogoUrl(home)}" class="w-5 h-5 inline"> ${home} vs <img src="${getLogoUrl(away)}" class="w-5 h-5 inline"> ${away}\n\n`;
-
+    let html = `📊 Head-to-Head: ${home} vs ${away}\n\n`;
 
     // Last 5 matches
     html += "Last 5 matches:\n";
@@ -577,8 +576,7 @@ document.addEventListener("click", async (e) => {
     const as = data.streaks?.[away];
     html += `\n\nLongest Winning Streaks:\n- ${home}: ${hs?.count || 0} (${hs?.span || "–"})\n- ${away}: ${as?.count || 0} (${as?.span || "–"})`;
 
-    content.innerHTML = html;
-
+    content.textContent = html;
   }
 
   modal.classList.remove("hidden");
