@@ -119,6 +119,8 @@ const users = { david:"david123", katja:"katja123", mark:"mark123", jus:"jus123"
 
 let currentUser="", currentGameweek="", deadlinesByWeek={};
 
+const gameweekCache = {};
+
 const loginBtn = document.getElementById("loginBtn");
 const showChangePwBtn = document.getElementById("showChangePwBtn");
 const changePwSection = document.getElementById("changePwSection");
