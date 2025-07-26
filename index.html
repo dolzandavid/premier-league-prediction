@@ -217,16 +217,40 @@ const weeks = [...new Set(fixtureDocs.docs.map(d => d.data().gameweek))]
     }
   }
 
+if (!currentGameweek) {
   currentGameweek = closestWeek || weeks[0] || "1";
+}
   const gameweekSelect = document.getElementById("gameweekSelect");
   gameweekSelect.innerHTML = weeks.map(w => `<option value="${w}">Gameweek ${w}</option>`).join("");
   gameweekSelect.value = currentGameweek;
   loadGameweekData();
 }
 
-document.getElementById("gameweekSelect").onchange = (e) => {
+document.getElementById("gameweekSelect").onchange = async (e) => {
   currentGameweek = e.target.value;
-  loadGameweekData();
+
+  // If gameweek already cached, use that
+  if (
+    gameweekCache[currentGameweek] &&
+    gameweekCache[currentGameweek].fixtures &&
+    gameweekCache[currentGameweek].predictions &&
+    gameweekCache[currentGameweek].results
+  ) {
+    const cached = gameweekCache[currentGameweek];
+    currentFixtures = cached.fixtures;
+    currentPredictions = cached.predictions;
+    currentResults = cached.results;
+    renderGameweek(currentFixtures, currentPredictions, currentResults);
+    renderLeaderboardsFromLocalCache();
+  } else {
+    // Otherwise fetch fresh
+    await loadGameweekData();
+  }
+
+  const deadline = deadlinesByWeek[currentGameweek];
+  document.getElementById("gameweekDeadline").textContent = deadline
+    ? `Deadline: ${new Date(deadline).toLocaleString()}`
+    : "";
 };
 
 async function loadGameweekData() {
