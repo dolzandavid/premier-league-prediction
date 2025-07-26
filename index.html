@@ -262,36 +262,6 @@ async function loadGameweekData() {
   renderGameweek(cachedFixtures, cachedPredictions, cachedResults);
 }
 
-// Load all predictions, results, and fixtures from Firestore
-const allPredDocs = await getDocs(collection(db, "predictions"));
-const allResDocs = await getDocs(collection(db, "results"));
-const allFixDocs = await getDocs(collection(db, "fixtures"));
-
-// Merge all predictions from multiple gameweeks
-const allPredictions = {};
-allPredDocs.forEach(doc => {
-  const data = doc.data(); // e.g. { fixtureId1: { user1: {...}, user2: {...} }, fixtureId2: { ... } }
-  for (const fid in data) {
-    if (!allPredictions[fid]) allPredictions[fid] = {};
-    for (const player in data[fid]) {
-      allPredictions[fid][player] = data[fid][player];
-    }
-  }
-});
-
-// Merge all results
-const allResults = {};
-allResDocs.forEach(doc => {
-  const data = doc.data(); // e.g. { fixtureId1: {home: 2, away: 1}, ... }
-  Object.assign(allResults, data);
-});
-
-// Gather all fixtures
-const allFixtures = allFixDocs.docs.map(d => ({ id: d.id, ...d.data() }));
-
-// Now render the leaderboard
-renderLeaderboards(allPredictions, allResults, allFixtures);
-}
 
 function renderGameweek(fixtures, predictions, results) {
   const container = document.getElementById("fixturesContainer");
