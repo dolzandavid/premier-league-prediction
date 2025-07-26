@@ -422,9 +422,57 @@ function renderGameweek() {
     // Render other players' predictions
     const predDiv = div.querySelector(".playersPredictions");
     const all = currentPredictions[fixture.id] || {};
-    if (Object.keys(all).length) {
+    const predDiv = div.querySelector(".playersPredictions");
+    const all = currentPredictions[fixture.id] || {};
+    const currentUserPred = all[currentUser];
+
+    // If fixture is finished and current user hasn't submitted a prediction, show others
+    const canSeeOthers = isLocked && !currentUserPred;
+
+    // If current user has submitted a prediction, always show others
+    const showTable = currentUserPred || canSeeOthers;
+
+    if (showTable) {
       let html = `
         <div class="mt-3 border border-gray-300 rounded overflow-hidden">
+          <table class="table-auto w-full text-sm">
+            <thead class="bg-gray-100 text-left">
+              <tr>
+                <th class="px-2 py-1">Player</th>
+                <th class="px-2 py-1">Prediction</th>
+                <th class="px-2 py-1">Points</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      for (let player in all) {
+        const p = all[player];
+        const res = currentResults[fixture.id];
+        let pts = res ? calculatePoints(p, res) : "-";
+
+        let ptsBgClass = "bg-gray-400";
+        if (typeof pts === "number") {
+          if (pts === 5) ptsBgClass = "bg-green-600";
+          else if (pts >= 2) ptsBgClass = "bg-yellow-500";
+          else ptsBgClass = "bg-red-500";
+        }
+
+        html += `
+          <tr class="hover:bg-gray-50">
+            <td class="border-t px-2 py-1">${player.charAt(0).toUpperCase() + player.slice(1)}</td>
+            <td class="border-t px-2 py-1">${p.home}:${p.away}</td>
+            <td class="border-t px-2 py-1">
+              <span class="px-2 py-1 rounded-full text-white text-xs ${ptsBgClass}">${pts}</span>
+            </td>
+          </tr>`;
+      }
+
+      html += `</tbody></table></div>`;
+      predDiv.innerHTML = html;
+    } else {
+      predDiv.innerHTML = `<span class="text-gray-400 italic">Not submitted</span>`;
+    }
           <table class="table-auto w-full text-sm">
             <thead class="bg-gray-100 text-left">
               <tr>
