@@ -263,6 +263,9 @@ loginBtn.onclick = async () => {
     currentUser = user;
       document.getElementById("leaderboardOverall").classList.add("hidden");
   document.getElementById("leaderboardOverallLoading").classList.remove("hidden");
+document.getElementById("leaderboardOverall").innerHTML = "";
+document.getElementById("leaderboardWeekly").innerHTML = "";
+
     loginSection.style.display = "none";
     appDiv.style.display = "block";
     welcomeUser.textContent = `Welcome, ${user.charAt(0).toUpperCase() + user.slice(1)}`;
