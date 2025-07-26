@@ -261,6 +261,8 @@ loginBtn.onclick = async () => {
 
   if (users[user] && pass === saved) {
     currentUser = user;
+      document.getElementById("leaderboardOverall").classList.add("hidden");
+  document.getElementById("leaderboardOverallLoading").classList.remove("hidden");
     loginSection.style.display = "none";
     appDiv.style.display = "block";
     welcomeUser.textContent = `Welcome, ${user.charAt(0).toUpperCase() + user.slice(1)}`;
