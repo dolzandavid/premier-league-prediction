@@ -163,8 +163,13 @@ changePwBtn.onclick = async () => {
 async function preloadAllGameweeks() {
   const fixtureDocs = await getDocs(collection(db, "fixtures"));
   const allFixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
-
   const weeks = [...new Set(allFixtures.map(f => f.gameweek))].filter(Boolean);
+
+  const deadlinesSnap = await getDocs(collection(db, "deadlines"));
+  const deadlineMap = {};
+  deadlinesSnap.forEach(doc => {
+    if (doc.exists()) deadlineMap[doc.id] = doc.data().deadline;
+  });
 
   for (let week of weeks) {
     const fixtures = allFixtures.filter(f => f.gameweek === week);
@@ -172,6 +177,8 @@ async function preloadAllGameweeks() {
     const resultsSnap = await getDoc(doc(db, "results", week));
     const predictions = predictionsSnap.exists() ? predictionsSnap.data() : {};
     const results = resultsSnap.exists() ? resultsSnap.data() : {};
+    const deadline = deadlineMap[week] || null;
+
     gameweekCache[week] = { fixtures, predictions, results, deadline };
   }
 }
