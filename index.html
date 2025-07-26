@@ -172,7 +172,7 @@ async function preloadAllGameweeks() {
     const resultsSnap = await getDoc(doc(db, "results", week));
     const predictions = predictionsSnap.exists() ? predictionsSnap.data() : {};
     const results = resultsSnap.exists() ? resultsSnap.data() : {};
-    gameweekCache[week] = { fixtures, predictions, results };
+    gameweekCache[week] = { fixtures, predictions, results, deadline };
   }
 }
 
@@ -268,7 +268,7 @@ async function loadGameweekData() {
 
   // If already cached, use it
   if (gameweekCache[currentGameweek]) {
-    const { fixtures, predictions, results } = gameweekCache[currentGameweek];
+    const { fixtures, predictions, results, deadline } = gameweekCache[currentGameweek];
     currentFixtures = fixtures;
     currentPredictions = predictions;
     currentResults = results;
@@ -288,6 +288,10 @@ async function loadGameweekData() {
   const results = resultsDoc.exists() ? resultsDoc.data() : {};
   const predictions = predictionsDoc.exists() ? predictionsDoc.data() : {};
   const deadline = deadlineDoc.exists() ? deadlineDoc.data()?.deadline : null;
+
+// Save in cache
+gameweekCache[currentGameweek] = { fixtures, predictions, results, deadline };
+
 
   document.getElementById("gameweekDeadline").textContent = deadline
     ? `Deadline: ${new Date(deadline).toLocaleString()}`
