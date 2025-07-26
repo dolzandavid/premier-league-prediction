@@ -183,6 +183,47 @@ async function preloadAllGameweeks() {
   }
 }
 
+async function determineClosestGameweek() {
+  const fixtureDocs = await getDocs(collection(db, "fixtures"));
+  const weeks = [...new Set(fixtureDocs.docs.map(d => d.data().gameweek))]
+    .filter(Boolean).sort((a, b) => +a - +b);
+
+  const deadlineDocs = await getDocs(collection(db, "deadlines"));
+  deadlinesByWeek = {};
+  deadlineDocs.forEach(docSnap => {
+    const data = docSnap.data();
+    if (data?.deadline) {
+      deadlinesByWeek[docSnap.id] = new Date(data.deadline);
+    }
+  });
+
+  const now = new Date();
+  let closestWeek = null, minDiff = Infinity;
+  for (let week of weeks) {
+    const deadline = deadlinesByWeek[week];
+    if (deadline) {
+      const diff = Math.abs(deadline - now);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestWeek = week;
+      }
+    }
+  }
+
+  currentGameweek = closestWeek || weeks[0] || "1";
+}
+
+async function populateGameweekDropdown() {
+  const fixtureDocs = await getDocs(collection(db, "fixtures"));
+  const weeks = [...new Set(fixtureDocs.docs.map(d => d.data().gameweek))]
+    .filter(Boolean).sort((a, b) => +a - +b);
+
+  const select = document.getElementById("gameweekSelect");
+  select.innerHTML = weeks.map(w =>
+    `<option value="${w}" ${w == currentGameweek ? "selected" : ""}>Gameweek ${w}</option>`
+  ).join("");
+}
+
 
 // Login handler
 loginBtn.onclick = async () => {
@@ -191,28 +232,33 @@ loginBtn.onclick = async () => {
   const pass = document.getElementById("password").value;
   const snap = await getDoc(doc(db, "passwords", user));
   const saved = snap.exists() ? snap.data().password : users[user];
-  if (users[user] && pass===saved) {
-    currentUser=user;
-    loginSection.style.display="none";
-    appDiv.style.display="block";
-    welcomeUser.textContent=`Welcome, ${user.charAt(0).toUpperCase()+user.slice(1)}`;
-    if (user==="david") {
+
+  if (users[user] && pass === saved) {
+    currentUser = user;
+    loginSection.style.display = "none";
+    appDiv.style.display = "block";
+    welcomeUser.textContent = `Welcome, ${user.charAt(0).toUpperCase() + user.slice(1)}`;
+
+    if (user === "david") {
       document.getElementById("fixtureEditor").classList.remove("hidden");
       document.getElementById("passwordResetSection").classList.remove("hidden");
       populatePasswordResetDropdown();
-      const all = await getDocs(collection(db,"fixtures"));
+
+      const all = await getDocs(collection(db, "fixtures"));
       if (all.empty) {
-        for(let gw=1;gw<=38;gw++){
-          const id=`${gw}_Team A_Team B_${Date.now()+gw}`;
-          await setDoc(doc(db,"fixtures",id),{home:"Team A",away:"Team B"});
+        for (let gw = 1; gw <= 38; gw++) {
+          const id = `${gw}_Team A_Team B_${Date.now() + gw}`;
+          await setDoc(doc(db, "fixtures", id), { home: "Team A", away: "Team B", gameweek: gw });
         }
         alert("Auto-generated placeholder fixtures.");
       }
     }
-document.getElementById("loadingOverlay").classList.remove("hidden");
-await preloadAllGameweeks();
-await loadGameweeks();
-document.getElementById("loadingOverlay").classList.add("hidden");
+
+    document.getElementById("loadingOverlay").classList.remove("hidden");
+    await determineClosestGameweek();      // ✅ new optimized function
+    await loadGameweekData();              // ✅ loads only 1 gameweek
+    await populateGameweekDropdown();      // ✅ fills dropdown
+    document.getElementById("loadingOverlay").classList.add("hidden");
 
   } else {
     alert("Invalid login");
