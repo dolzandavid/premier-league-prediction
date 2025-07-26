@@ -228,31 +228,20 @@ if (!currentGameweek) {
   loadGameweekData();
 }
 
-document.getElementById("gameweekSelect").onchange = async (e) => {
+document.getElementById("gameweekSelect").onchange = (e) => {
   currentGameweek = e.target.value;
 
-  // If gameweek already cached, use that
-  if (
-    gameweekCache[currentGameweek] &&
-    gameweekCache[currentGameweek].fixtures &&
-    gameweekCache[currentGameweek].predictions &&
-    gameweekCache[currentGameweek].results
-  ) {
-    const cached = gameweekCache[currentGameweek];
-    currentFixtures = cached.fixtures;
-    currentPredictions = cached.predictions;
-    currentResults = cached.results;
-    renderGameweek(currentFixtures, currentPredictions, currentResults);
-    renderLeaderboardsFromLocalCache();
+  // If we've already cached this gameweek, render it from memory
+  if (gameweekCache[currentGameweek]) {
+    const { fixtures, predictions, results } = gameweekCache[currentGameweek];
+    currentFixtures = fixtures;
+    currentPredictions = predictions;
+    currentResults = results;
+    renderGameweek();
   } else {
-    // Otherwise fetch fresh
-    await loadGameweekData();
+    // Otherwise load it from Firestore
+    loadGameweekData();
   }
-
-  const deadline = deadlinesByWeek[currentGameweek];
-  document.getElementById("gameweekDeadline").textContent = deadline
-    ? `Deadline: ${new Date(deadline).toLocaleString()}`
-    : "";
 };
 
 async function loadGameweekData() {
