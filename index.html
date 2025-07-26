@@ -228,53 +228,51 @@ if (!currentGameweek) {
   loadGameweekData();
 }
 
-document.getElementById("gameweekSelect").onchange = (e) => {
+document.getElementById("gameweekSelect").onchange = async (e) => {
   currentGameweek = e.target.value;
-
-  // If we've already cached this gameweek, render it from memory
-  if (gameweekCache[currentGameweek]) {
-    const { fixtures, predictions, results } = gameweekCache[currentGameweek];
-    currentFixtures = fixtures;
-    currentPredictions = predictions;
-    currentResults = results;
-    renderGameweek();
-  } else {
-    // Otherwise load it from Firestore
-    loadGameweekData();
-  }
+  await loadGameweekData();
 };
 
 async function loadGameweekData() {
   const fixturesContainer = document.getElementById("fixturesContainer");
   fixturesContainer.innerHTML = "";
 
-  // Load fixtures if not cached
-  if (!cachedFixtures.length) {
-    const q = query(collection(db, "fixtures"), where("gameweek", "==", currentGameweek));
-    const fixtureDocs = await getDocs(q);
-    cachedFixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
+  // If already cached, use it
+  if (gameweekCache[currentGameweek]) {
+    const { fixtures, predictions, results } = gameweekCache[currentGameweek];
+    currentFixtures = fixtures;
+    currentPredictions = predictions;
+    currentResults = results;
+    renderGameweek();
+    return;
   }
 
-  // Load results if not cached
-  if (!Object.keys(cachedResults).length) {
-    const resultsDoc = await getDoc(doc(db, "results", currentGameweek));
-    cachedResults = resultsDoc.exists() ? resultsDoc.data() : {};
-  }
+  // Load from Firestore
+  const q = query(collection(db, "fixtures"), where("gameweek", "==", currentGameweek));
+  const fixtureDocs = await getDocs(q);
+  const fixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
 
-  // Load predictions if not cached
-  if (!Object.keys(cachedPredictions).length) {
-    const predictionsDoc = await getDoc(doc(db, "predictions", currentGameweek));
-    cachedPredictions = predictionsDoc.exists() ? predictionsDoc.data() : {};
-  }
-
-  // Load deadline
+  const resultsDoc = await getDoc(doc(db, "results", currentGameweek));
+  const predictionsDoc = await getDoc(doc(db, "predictions", currentGameweek));
   const deadlineDoc = await getDoc(doc(db, "deadlines", currentGameweek));
+
+  const results = resultsDoc.exists() ? resultsDoc.data() : {};
+  const predictions = predictionsDoc.exists() ? predictionsDoc.data() : {};
   const deadline = deadlineDoc.exists() ? deadlineDoc.data()?.deadline : null;
+
   document.getElementById("gameweekDeadline").textContent = deadline
     ? `Deadline: ${new Date(deadline).toLocaleString()}`
     : "";
 
-  renderGameweek(cachedFixtures, cachedPredictions, cachedResults);
+  // Cache for this gameweek
+  gameweekCache[currentGameweek] = { fixtures, predictions, results };
+
+  // Set current data for render
+  currentFixtures = fixtures;
+  currentPredictions = predictions;
+  currentResults = results;
+
+  renderGameweek();
 }
 
 
