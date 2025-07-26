@@ -152,6 +152,23 @@ changePwBtn.onclick = async () => {
   oldPw.value=""; newPw.value="";
 };
 
+async function preloadAllGameweeks() {
+  const fixtureDocs = await getDocs(collection(db, "fixtures"));
+  const allFixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  const weeks = [...new Set(allFixtures.map(f => f.gameweek))].filter(Boolean);
+
+  for (let week of weeks) {
+    const fixtures = allFixtures.filter(f => f.gameweek === week);
+    const predictionsSnap = await getDoc(doc(db, "predictions", week));
+    const resultsSnap = await getDoc(doc(db, "results", week));
+    const predictions = predictionsSnap.exists() ? predictionsSnap.data() : {};
+    const results = resultsSnap.exists() ? resultsSnap.data() : {};
+    gameweekCache[week] = { fixtures, predictions, results };
+  }
+}
+
+
 // Login handler
 loginBtn.onclick = async () => {
   console.log("Login clicked");
@@ -177,7 +194,8 @@ loginBtn.onclick = async () => {
         alert("Auto-generated placeholder fixtures.");
       }
     }
-    await loadGameweeks();
+await preloadAllGameweeks();
+await loadGameweeks();  // this sets currentGameweek and calls loadGameweekData()
   } else {
     alert("Invalid login");
   }
