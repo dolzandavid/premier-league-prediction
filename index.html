@@ -284,6 +284,7 @@ function renderGameweek() {
     const result = currentResults[fixture.id];
     const pred = currentPredictions[fixture.id]?.[currentUser];
     const isLocked = !!result;
+    const hasPrediction = !!pred;
 
     const div = document.createElement("div");
     div.className = "border p-3 my-2 bg-white rounded shadow";
@@ -311,36 +312,35 @@ function renderGameweek() {
           </div>` : ""}
       </div>
 
-      <div class="mt-2 flex space-x-4">
+      <div class="mt-2 flex flex-wrap items-center gap-6">
         <div>
-          <label class="text-sm block">Your Prediction:</label>
+          <label class="text-sm block mb-1">Your Prediction:</label>
           ${
-            isLocked && pred
-              ? `<div class="bg-blue-100 border px-2 py-1 inline-block rounded">${pred.home} : ${pred.away}</div>`
-              : pred
+            isLocked
+              ? hasPrediction
+                ? `<div class="bg-blue-100 border px-2 py-1 inline-block rounded">${pred.home} : ${pred.away}</div>`
+                : `<div class="text-red-500 italic">Not submitted</div>`
+              : hasPrediction
                 ? `<input type="number" min="0" class="border p-1 w-12 predHome" value="${pred?.home ?? ""}">
                    :
                    <input type="number" min="0" class="border p-1 w-12 predAway" value="${pred?.away ?? ""}">
                    <button class="savePred bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 ml-2 rounded text-sm">Save</button>
                    <button class="deletePred bg-red-500 hover:bg-red-600 text-white px-2 py-1 ml-2 rounded text-sm">Delete</button>`
-                : isLocked
-                  ? `<div class="text-red-500 italic">Not submitted</div>`
-                  : `<input type="number" min="0" class="border p-1 w-12 predHome" value="">
-                     :
-                     <input type="number" min="0" class="border p-1 w-12 predAway" value="">
-                     <button class="savePred bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 ml-2 rounded text-sm">Save</button>`
+                : `<input type="number" min="0" class="border p-1 w-12 predHome" value="">
+                   :
+                   <input type="number" min="0" class="border p-1 w-12 predAway" value="">
+                   <button class="savePred bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 ml-2 rounded text-sm">Save</button>`
           }
         </div>
 
         <div>
+          <label class="text-sm block mb-1">Result:</label>
           ${
             result
-              ? `<label class="text-sm block">Result:</label>
-                 <div class="bg-gray-200 border px-2 py-1 inline-block rounded">${result.home} : ${result.away}</div>
+              ? `<div class="bg-gray-200 border px-2 py-1 inline-block rounded">${result.home} : ${result.away}</div>
                  ${currentUser === "david" ? `<button class="deleteRes bg-red-500 hover:bg-red-600 text-white px-2 py-1 ml-2 rounded text-sm">Delete</button>` : ""}`
               : currentUser === "david"
-                ? `<label class="text-sm block">Result:</label>
-                   <input type="number" min="0" class="border p-1 w-12 resHome" value="">
+                ? `<input type="number" min="0" class="border p-1 w-12 resHome" value="">
                    :
                    <input type="number" min="0" class="border p-1 w-12 resAway" value="">
                    <button class="saveRes bg-green-500 hover:bg-green-600 text-white px-2 py-1 ml-2 rounded text-sm">Save</button>`
@@ -354,7 +354,7 @@ function renderGameweek() {
 
     fixturesContainer.appendChild(div);
 
-    // Add event listeners
+    // Event listeners (unchanged)
     div.querySelector(".savePred")?.addEventListener("click", async () => {
       const h = div.querySelector(".predHome").value;
       const a = div.querySelector(".predAway").value;
@@ -419,20 +419,13 @@ function renderGameweek() {
       renderGameweek();
     });
 
-    // Render other players' predictions
+    // Show predictions from others ONLY if this user submitted one or the fixture is not locked
     const predDiv = div.querySelector(".playersPredictions");
     const all = currentPredictions[fixture.id] || {};
-    const predDiv = div.querySelector(".playersPredictions");
-    const all = currentPredictions[fixture.id] || {};
-    const currentUserPred = all[currentUser];
 
-    // If fixture is finished and current user hasn't submitted a prediction, show others
-    const canSeeOthers = isLocked && !currentUserPred;
+    const showOthers = hasPrediction || !isLocked;
 
-    // If current user has submitted a prediction, always show others
-    const showTable = currentUserPred || canSeeOthers;
-
-    if (showTable) {
+    if (showOthers && Object.keys(all).length > 0) {
       let html = `
         <div class="mt-3 border border-gray-300 rounded overflow-hidden">
           <table class="table-auto w-full text-sm">
@@ -445,44 +438,6 @@ function renderGameweek() {
             </thead>
             <tbody>
       `;
-
-      for (let player in all) {
-        const p = all[player];
-        const res = currentResults[fixture.id];
-        let pts = res ? calculatePoints(p, res) : "-";
-
-        let ptsBgClass = "bg-gray-400";
-        if (typeof pts === "number") {
-          if (pts === 5) ptsBgClass = "bg-green-600";
-          else if (pts >= 2) ptsBgClass = "bg-yellow-500";
-          else ptsBgClass = "bg-red-500";
-        }
-
-        html += `
-          <tr class="hover:bg-gray-50">
-            <td class="border-t px-2 py-1">${player.charAt(0).toUpperCase() + player.slice(1)}</td>
-            <td class="border-t px-2 py-1">${p.home}:${p.away}</td>
-            <td class="border-t px-2 py-1">
-              <span class="px-2 py-1 rounded-full text-white text-xs ${ptsBgClass}">${pts}</span>
-            </td>
-          </tr>`;
-      }
-
-      html += `</tbody></table></div>`;
-      predDiv.innerHTML = html;
-    } else {
-      predDiv.innerHTML = `<span class="text-gray-400 italic">Not submitted</span>`;
-    }
-          <table class="table-auto w-full text-sm">
-            <thead class="bg-gray-100 text-left">
-              <tr>
-                <th class="px-2 py-1">Player</th>
-                <th class="px-2 py-1">Prediction</th>
-                <th class="px-2 py-1">Points</th>
-              </tr>
-            </thead>
-            <tbody>
-      `;
       for (let player in all) {
         const p = all[player];
         const res = currentResults[fixture.id];
@@ -507,7 +462,7 @@ function renderGameweek() {
       html += `</tbody></table></div>`;
       predDiv.innerHTML = html;
     } else {
-      predDiv.innerHTML = `<span class="text-gray-400 italic">No predictions submitted yet.</span>`;
+      predDiv.innerHTML = "";
     }
   }
 
