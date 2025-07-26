@@ -332,17 +332,22 @@ function renderGameweek(fixtures, predictions, results) {
     container.appendChild(div);
 
     // 🔧 Prediction Save
-    div.querySelector(".savePred")?.addEventListener("click", async () => {
-      const h = div.querySelector(".predHome").value;
-      const a = div.querySelector(".predAway").value;
-      const snap = await getDoc(doc(db, "predictions", currentGameweek));
-      const data = snap.exists() ? snap.data() : {};
-      if (!data[fixture.id]) data[fixture.id] = {};
-      data[fixture.id][currentUser] = { home: +h, away: +a };
-      await setDoc(doc(db, "predictions", currentGameweek), data);
-      cachedPredictions = data;
-      renderGameweek(cachedFixtures, cachedPredictions, cachedResults);
-    });
+div.querySelector(".savePred")?.addEventListener("click", async () => {
+  const h = div.querySelector(".predHome").value;
+  const a = div.querySelector(".predAway").value;
+  const snap = await getDoc(doc(db, "predictions", currentGameweek));
+  const data = snap.exists() ? snap.data() : {};
+  if (!data[fixture.id]) data[fixture.id] = {};
+  data[fixture.id][currentUser] = { home: +h, away: +a };
+  await setDoc(doc(db, "predictions", currentGameweek), data);
+  
+  // Update local cache
+  currentPredictions[fixture.id] = data[fixture.id];
+  
+  // Re-render
+  renderGameweek(currentFixtures, currentPredictions, currentResults);
+  renderLeaderboardsFromLocalCache();
+});
 
     // 🔧 Prediction Delete
     div.querySelector(".deletePred")?.addEventListener("click", async () => {
@@ -352,8 +357,12 @@ function renderGameweek(fixtures, predictions, results) {
       delete data[fixture.id][currentUser];
       if (Object.keys(data[fixture.id]).length === 0) delete data[fixture.id];
       await setDoc(doc(db, "predictions", currentGameweek), data);
-      cachedPredictions = data;
-      renderGameweek(cachedFixtures, cachedPredictions, cachedResults);
+  // Update local cache
+  currentPredictions[fixture.id] = data[fixture.id];
+  
+  // Re-render
+  renderGameweek(currentFixtures, currentPredictions, currentResults);
+  renderLeaderboardsFromLocalCache();
     });
 
     // 🔧 Result Save
@@ -364,8 +373,12 @@ function renderGameweek(fixtures, predictions, results) {
       const data = snap.exists() ? snap.data() : {};
       data[fixture.id] = { home: +h, away: +a };
       await setDoc(doc(db, "results", currentGameweek), data);
-      cachedResults = data;
-      renderGameweek(cachedFixtures, cachedPredictions, cachedResults);
+  // Update local cache
+  currentPredictions[fixture.id] = data[fixture.id];
+  
+  // Re-render
+  renderGameweek(currentFixtures, currentPredictions, currentResults);
+  renderLeaderboardsFromLocalCache();
     });
 
     // 🔧 Result Delete
@@ -376,8 +389,12 @@ function renderGameweek(fixtures, predictions, results) {
       const data = snap.data();
       delete data[fixture.id];
       await setDoc(doc(db, "results", currentGameweek), data);
-      cachedResults = data;
-      renderGameweek(cachedFixtures, cachedPredictions, cachedResults);
+  // Update local cache
+  currentPredictions[fixture.id] = data[fixture.id];
+  
+  // Re-render
+  renderGameweek(currentFixtures, currentPredictions, currentResults);
+  renderLeaderboardsFromLocalCache();
     });
 
     // 🔧 Edit & Delete Fixture
@@ -623,6 +640,32 @@ document.addEventListener("click", async (e) => {
 
 document.getElementById("closeHistoryBtn").onclick = () =>
   document.getElementById("historyModal").classList.add("hidden");
+
+function renderLeaderboardsFromLocalCache() {
+  if (!currentFixtures || !currentResults || !currentPredictions) return;
+
+  // Merge all predictions and results from ALL gameweeks
+  const allPredictions = {};
+  const allResults = {};
+  const allFixtures = [];
+
+  // Only current gameweek data (for now)
+  for (const fixture of currentFixtures) {
+    const fid = fixture.id;
+    allFixtures.push(fixture);
+
+    if (currentPredictions[fid]) {
+      allPredictions[fid] = currentPredictions[fid];
+    }
+
+    if (currentResults[fid]) {
+      allResults[fid] = currentResults[fid];
+    }
+  }
+
+  renderLeaderboards(allPredictions, allResults, allFixtures);
+}
+
 
 </script>
 </body>
