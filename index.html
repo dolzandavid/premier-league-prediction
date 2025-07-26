@@ -423,7 +423,7 @@ function renderGameweek() {
     const predDiv = div.querySelector(".playersPredictions");
     const all = currentPredictions[fixture.id] || {};
 
-    const showOthers = hasPrediction || !isLocked;
+    const showOthers = hasPrediction;
 
     if (showOthers && Object.keys(all).length > 0) {
       let html = `
