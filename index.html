@@ -780,30 +780,23 @@ document.getElementById("closeHistoryBtn").onclick = () =>
   document.getElementById("historyModal").classList.add("hidden");
 
 function renderLeaderboardsFromLocalCache() {
-  if (!currentFixtures || !currentResults || !currentPredictions) return;
-
-  // Merge all predictions and results from ALL gameweeks
   const allPredictions = {};
   const allResults = {};
   const allFixtures = [];
 
-  // Only current gameweek data (for now)
-  for (const fixture of currentFixtures) {
-    const fid = fixture.id;
-    allFixtures.push(fixture);
+  for (const week of Object.keys(gameweekCache)) {
+    const { fixtures, predictions, results } = gameweekCache[week];
 
-    if (currentPredictions[fid]) {
-      allPredictions[fid] = currentPredictions[fid];
-    }
-
-    if (currentResults[fid]) {
-      allResults[fid] = currentResults[fid];
+    for (const fixture of fixtures || []) {
+      allFixtures.push(fixture);
+      const fid = fixture.id;
+      if (predictions?.[fid]) allPredictions[fid] = predictions[fid];
+      if (results?.[fid]) allResults[fid] = results[fid];
     }
   }
 
   renderLeaderboards(allPredictions, allResults, allFixtures);
 }
-
 
 </script>
 </body>
