@@ -190,8 +190,15 @@ async function preloadAllGameweeks() {
 async function loadAllGameweekDataForLeaderboards() {
   const fixtureDocs = await getDocs(collection(db, "fixtures"));
   const allFixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
-
   const weeks = [...new Set(allFixtures.map(f => f.gameweek))].filter(Boolean);
+
+  const deadlineSnap = await getDocs(collection(db, "deadlines"));
+  deadlineSnap.forEach(doc => {
+    if (doc.exists()) {
+      deadlinesByWeek[doc.id] = new Date(doc.data().deadline);
+    }
+  });
+
   for (let week of weeks) {
     if (!gameweekCache[week]) gameweekCache[week] = {};
     const fixtures = allFixtures.filter(f => f.gameweek === week);
@@ -206,6 +213,7 @@ async function loadAllGameweekDataForLeaderboards() {
     gameweekCache[week].results = resSnap.exists() ? resSnap.data() : {};
   }
 
+  // ✅ Only now is it safe to render
   renderLeaderboardsFromLocalCache();
 }
 
@@ -793,6 +801,12 @@ document.getElementById("closeHistoryBtn").onclick = () =>
   document.getElementById("historyModal").classList.add("hidden");
 
 function renderLeaderboardsFromLocalCache() {
+   const leaderboardEl = document.getElementById("leaderboardOverall");
+  const loadingEl = document.getElementById("leaderboardOverallLoading");
+
+  // Hide while rendering
+  leaderboardEl.classList.add("hidden");
+  loadingEl.classList.remove("hidden");
   const allPredictions = {};
   const allResults = {};
   const allFixtures = [];
@@ -809,6 +823,9 @@ function renderLeaderboardsFromLocalCache() {
   }
 
   renderLeaderboards(allPredictions, allResults, allFixtures);
+    leaderboardEl.classList.remove("hidden");
+  loadingEl.classList.add("hidden");
+
 }
 
 </script>
