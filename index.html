@@ -93,7 +93,11 @@
       <!-- Leaderboards -->
       <div class="mb-6">
         <h2 class="text-lg font-semibold mb-2">Overall Leaderboard</h2>
-        <div id="leaderboardOverall" class="overflow-x-auto"></div>
+        <div id="leaderboardOverallContainer">
+  <div id="leaderboardOverallLoading" class="text-gray-600 text-sm italic mb-2">Loading leaderboard...</div>
+  <div id="leaderboardOverall" class="overflow-x-auto hidden"></div>
+</div>
+
         <h2 class="text-lg font-semibold mt-6 mb-2">Weekly Leaderboard</h2>
         <div id="leaderboardWeekly" class="overflow-x-auto"></div>
       </div>
@@ -675,6 +679,10 @@ function renderLeaderboards(allPredictions, allResults, allFixtures) {
 
   document.getElementById("leaderboardOverall").innerHTML = render(overall, exacts, outcomes, counts);
   document.getElementById("leaderboardWeekly").innerHTML = render(weekly, wExacts, wOutcomes, wCounts);
+
+  // ✅ Show overall leaderboard once it's accurate
+document.getElementById("leaderboardOverall").classList.remove("hidden");
+document.getElementById("leaderboardOverallLoading").classList.add("hidden");
 }
 
 function populatePasswordResetDropdown() {
