@@ -274,14 +274,19 @@ async function loadGameweekData() {
   fixturesContainer.innerHTML = "";
 
   // If already cached, use it
-  if (gameweekCache[currentGameweek]) {
-    const { fixtures, predictions, results, deadline } = gameweekCache[currentGameweek];
-    currentFixtures = fixtures;
-    currentPredictions = predictions;
-    currentResults = results;
-    renderGameweek();
-    return;
-  }
+if (gameweekCache[currentGameweek]) {
+  const { fixtures, predictions, results, deadline } = gameweekCache[currentGameweek];
+  currentFixtures = fixtures;
+  currentPredictions = predictions;
+  currentResults = results;
+
+  document.getElementById("gameweekDeadline").textContent = deadline
+    ? `Deadline: ${new Date(deadline).toLocaleString()}`
+    : "";
+
+  renderGameweek();
+  return;
+}
 
   // Load from Firestore
   const q = query(collection(db, "fixtures"), where("gameweek", "==", currentGameweek));
