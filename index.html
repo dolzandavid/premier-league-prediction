@@ -183,6 +183,28 @@ async function preloadAllGameweeks() {
   }
 }
 
+async function loadAllGameweekDataForLeaderboards() {
+  const fixtureDocs = await getDocs(collection(db, "fixtures"));
+  const allFixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  const weeks = [...new Set(allFixtures.map(f => f.gameweek))].filter(Boolean);
+  for (let week of weeks) {
+    if (!gameweekCache[week]) gameweekCache[week] = {};
+    const fixtures = allFixtures.filter(f => f.gameweek === week);
+
+    const [predSnap, resSnap] = await Promise.all([
+      getDoc(doc(db, "predictions", week)),
+      getDoc(doc(db, "results", week))
+    ]);
+
+    gameweekCache[week].fixtures = fixtures;
+    gameweekCache[week].predictions = predSnap.exists() ? predSnap.data() : {};
+    gameweekCache[week].results = resSnap.exists() ? resSnap.data() : {};
+  }
+
+  renderLeaderboardsFromLocalCache();
+}
+
 async function determineClosestGameweek() {
   const fixtureDocs = await getDocs(collection(db, "fixtures"));
   const weeks = [...new Set(fixtureDocs.docs.map(d => d.data().gameweek))]
@@ -259,6 +281,8 @@ loginBtn.onclick = async () => {
     await loadGameweekData();              // ✅ loads only 1 gameweek
     await populateGameweekDropdown();      // ✅ fills dropdown
     document.getElementById("loadingOverlay").classList.add("hidden");
+    loadAllGameweekDataForLeaderboards();
+
 
   } else {
     alert("Invalid login");
