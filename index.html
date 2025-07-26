@@ -467,7 +467,22 @@ function renderGameweek() {
     }
   }
 
-  renderLeaderboards(currentPredictions, currentResults, currentFixtures);
+// Rebuild merged predictions/results/fixtures from all cached gameweeks
+const allPredictions = {};
+const allResults = {};
+const allFixtures = [];
+
+Object.values(gameweekCache).forEach(({ fixtures, predictions, results }) => {
+  fixtures.forEach(f => allFixtures.push(f));
+  for (const [fid, preds] of Object.entries(predictions)) {
+    allPredictions[fid] = { ...(allPredictions[fid] || {}), ...preds };
+  }
+  for (const [fid, res] of Object.entries(results)) {
+    allResults[fid] = res;
+  }
+});
+
+renderLeaderboards(allPredictions, allResults, allFixtures);
 }
 
 function calculatePoints(pred, res) {
