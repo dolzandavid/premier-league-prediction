@@ -333,20 +333,21 @@ function renderGameweek() {
           }
         </div>
 
-        <div>
-          <label class="text-sm block mb-1">Result:</label>
-          ${
-            result
-              ? `<div class="bg-gray-200 border px-2 py-1 inline-block rounded">${result.home} : ${result.away}</div>
-                 ${currentUser === "david" ? `<button class="deleteRes bg-red-500 hover:bg-red-600 text-white px-2 py-1 ml-2 rounded text-sm">Delete</button>` : ""}`
-              : currentUser === "david"
-                ? `<input type="number" min="0" class="border p-1 w-12 resHome" value="">
-                   :
-                   <input type="number" min="0" class="border p-1 w-12 resAway" value="">
-                   <button class="saveRes bg-green-500 hover:bg-green-600 text-white px-2 py-1 ml-2 rounded text-sm">Save</button>`
-                : ""
-          }
-        </div>
+<div>
+  ${
+    result
+      ? `<label class="text-sm block">Result:</label>
+         <div class="bg-gray-200 border px-2 py-1 inline-block rounded">${result.home} : ${result.away}</div>
+         ${currentUser === "david" ? `<button class="deleteRes bg-red-500 hover:bg-red-600 text-white px-2 py-1 ml-2 rounded text-sm">Delete</button>` : ""}`
+      : currentUser === "david"
+        ? `<label class="text-sm block">Result:</label>
+           <input type="number" min="0" class="border p-1 w-12 resHome" value="">
+           :
+           <input type="number" min="0" class="border p-1 w-12 resAway" value="">
+           <button class="saveRes bg-green-500 hover:bg-green-600 text-white px-2 py-1 ml-2 rounded text-sm">Save</button>`
+        : ``
+  }
+</div>
       </div>
 
       <div class="text-sm mt-2 playersPredictions"></div>
