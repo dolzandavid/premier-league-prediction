@@ -528,6 +528,9 @@ div.innerHTML = `
       data[fixture.id][currentUser] = { home: +h, away: +a };
       await setDoc(doc(db, "predictions", currentGameweek), data);
       currentPredictions[fixture.id] = { ...currentPredictions[fixture.id], [currentUser]: { home: +h, away: +a } };
+      gameweekCache[currentGameweek].predictions = currentPredictions;
+      sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+
       renderGameweek();
     });
 
@@ -541,6 +544,8 @@ div.innerHTML = `
       if (currentPredictions[fixture.id]) {
         delete currentPredictions[fixture.id][currentUser];
       }
+      gameweekCache[currentGameweek].predictions = currentPredictions;
+      sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
       renderGameweek();
     });
 
@@ -552,6 +557,9 @@ div.innerHTML = `
       data[fixture.id] = { home: +h, away: +a };
       await setDoc(doc(db, "results", currentGameweek), data);
       currentResults[fixture.id] = { home: +h, away: +a };
+      gameweekCache[currentGameweek].results = currentResults;
+      sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+
       renderGameweek();
     });
 
@@ -563,6 +571,9 @@ div.innerHTML = `
       delete data[fixture.id];
       await setDoc(doc(db, "results", currentGameweek), data);
       delete currentResults[fixture.id];
+gameweekCache[currentGameweek].results = currentResults;
+sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+
       renderGameweek();
     });
 
@@ -758,6 +769,16 @@ document.getElementById("setDeadlineBtn").onclick = async () => {
   const deadline = document.getElementById("deadlineInput").value;
   if (!deadline) return;
   await setDoc(doc(db, "deadlines", currentGameweek), { deadline });
+deadlinesByWeek[currentGameweek] = new Date(deadline);
+
+// ✅ Also update gameweekCache
+if (!gameweekCache[currentGameweek]) gameweekCache[currentGameweek] = {};
+gameweekCache[currentGameweek].deadline = deadline;
+
+// ✅ Persist to sessionStorage
+sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+sessionStorage.setItem("deadlinesByWeek", JSON.stringify(deadlinesByWeek));
+
   loadGameweekData();
 };
 
