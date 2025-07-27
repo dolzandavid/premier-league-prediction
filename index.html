@@ -297,11 +297,12 @@ document.getElementById("leaderboardWeekly").innerHTML = "";
     }
 
     document.getElementById("loadingOverlay").classList.remove("hidden");
-    await determineClosestGameweek();      // ✅ new optimized function
-    await loadGameweekData();              // ✅ loads only 1 gameweek
-    await populateGameweekDropdown();      // ✅ fills dropdown
-    document.getElementById("loadingOverlay").classList.add("hidden");
-    loadAllGameweekDataForLeaderboards();
+
+await determineClosestGameweek();
+await loadAllGameweekDataForLeaderboards(); // load all predictions/results first
+await populateGameweekDropdown();
+await loadGameweekData(); // now this will find data for currentGameweek
+document.getElementById("loadingOverlay").classList.add("hidden");
     
     localStorage.setItem("loggedInUser", user);
     localStorage.setItem("selectedGameweek", currentGameweek);
