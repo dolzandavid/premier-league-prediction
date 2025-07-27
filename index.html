@@ -261,6 +261,14 @@ async function populateGameweekDropdown() {
   ).join("");
 }
 
+function populateGameweekDropdownFromCache() {
+  const weeks = Object.keys(gameweekCache).sort((a, b) => +a - +b);
+  const select = document.getElementById("gameweekSelect");
+  select.innerHTML = weeks.map(w =>
+    `<option value="${w}" ${w == currentGameweek ? "selected" : ""}>Gameweek ${w}</option>`
+  ).join("");
+}
+
 
 // Login handler
 loginBtn.onclick = async () => {
@@ -851,9 +859,17 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     document.getElementById("loadingOverlay").classList.remove("hidden");
 
-    await loadAllGameweekDataForLeaderboards(); // ✅ populate predictions/results in gameweekCache
-    await populateGameweekDropdown();           // ✅ update dropdown
-    await loadGameweekData();                   // ✅ render selected gameweek
+    // 🧠 Only reload if the cache is empty (first visit)
+    if (Object.keys(gameweekCache).length === 0) {
+      await loadAllGameweekDataForLeaderboards(); // loads all predictions/results
+      await populateGameweekDropdown();           // fills dropdown from Firestore
+    } else {
+      // ✅ Use cached data
+      populateGameweekDropdownFromCache();
+      renderLeaderboardsFromLocalCache();
+    }
+
+    await loadGameweekData(); // renders selected gameweek (cached if available)
 
     document.getElementById("loadingOverlay").classList.add("hidden");
   }
