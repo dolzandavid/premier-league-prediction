@@ -452,7 +452,7 @@ div.innerHTML = `
       <label class="text-sm block mb-1">Your Prediction:</label>
       ${
         isLocked && pred
-          ? `<div class="bg-blue-100 border px-3 py-1 rounded">${pred.home} : ${pred.away}</div>`
+          ? `<div class="inline-block bg-blue-100 border px-3 py-1 rounded">${pred.home} : ${pred.away}</div>`
           : pred
             ? `<div class="flex flex-wrap items-center gap-2">
                 <input type="number" min="0" class="border p-2 w-16 predHome" value="${pred?.home ?? ""}">
