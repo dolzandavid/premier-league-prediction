@@ -130,34 +130,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-window.addEventListener("DOMContentLoaded", async () => {
-  const savedUser = localStorage.getItem("loggedInUser");
-  const savedGameweek = localStorage.getItem("selectedGameweek");
-
-  if (savedUser && users[savedUser]) {
-    currentUser = savedUser;
-    currentGameweek = savedGameweek || "1";
-
-    // Set up UI
-    loginSection.style.display = "none";
-    appDiv.style.display = "block";
-    welcomeUser.textContent = `Welcome, ${savedUser.charAt(0).toUpperCase() + savedUser.slice(1)}`;
-
-    if (savedUser === "david") {
-      document.getElementById("fixtureEditor").classList.remove("hidden");
-      document.getElementById("passwordResetSection").classList.remove("hidden");
-      populatePasswordResetDropdown();
-    }
-
-    document.getElementById("loadingOverlay").classList.remove("hidden");
-
-    await loadAllGameweekDataForLeaderboards(); // loads all predictions/results
-    await populateGameweekDropdown(); // rebuild dropdown
-    await loadGameweekData();         // loads currentGameweek
-    document.getElementById("loadingOverlay").classList.add("hidden");
-  }
-});
-
 const users = { david:"david123", katja:"katja123", mark:"mark123", jus:"jus123" };
 
 let currentUser="", currentGameweek="", deadlinesByWeek={};
@@ -857,6 +829,34 @@ function renderLeaderboardsFromLocalCache() {
   loadingEl.classList.add("hidden");
 
 }
+
+window.addEventListener("DOMContentLoaded", async () => {
+  const savedUser = localStorage.getItem("loggedInUser");
+  const savedGameweek = localStorage.getItem("selectedGameweek");
+
+  if (savedUser && users[savedUser]) {
+    currentUser = savedUser;
+    currentGameweek = savedGameweek || "1";
+
+    loginSection.style.display = "none";
+    appDiv.style.display = "block";
+    welcomeUser.textContent = `Welcome, ${savedUser.charAt(0).toUpperCase() + savedUser.slice(1)}`;
+
+    if (savedUser === "david") {
+      document.getElementById("fixtureEditor").classList.remove("hidden");
+      document.getElementById("passwordResetSection").classList.remove("hidden");
+      populatePasswordResetDropdown();
+    }
+
+    document.getElementById("loadingOverlay").classList.remove("hidden");
+
+    await loadAllGameweekDataForLeaderboards(); // ✅ populate predictions/results in gameweekCache
+    await populateGameweekDropdown();           // ✅ update dropdown
+    await loadGameweekData();                   // ✅ render selected gameweek
+
+    document.getElementById("loadingOverlay").classList.add("hidden");
+  }
+});
 
 </script>
 </body>
