@@ -391,26 +391,34 @@ async function loadGameweekData() {
 
   let cache = gameweekCache[currentGameweek] || {};
 
-  // Fetch fixtures if missing
+  // ✅ Fetch fixtures if missing
   if (!cache.fixtures) {
     const q = query(collection(db, "fixtures"), where("gameweek", "==", currentGameweek));
     const fixtureDocs = await getDocs(q);
     cache.fixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
   }
 
-  // Use preloaded predictions/results if available
-  cache.predictions = cache.predictions || {};
-  cache.results = cache.results || {};
+  // ✅ Fetch predictions if missing
+  if (!cache.predictions) {
+    const predSnap = await getDoc(doc(db, "predictions", currentGameweek));
+    cache.predictions = predSnap.exists() ? predSnap.data() : {};
+  }
 
-  // Use deadline from global cache if missing
+  // ✅ Fetch results if missing
+  if (!cache.results) {
+    const resSnap = await getDoc(doc(db, "results", currentGameweek));
+    cache.results = resSnap.exists() ? resSnap.data() : {};
+  }
+
+  // ✅ Fetch deadline from global cache if available
   if (!cache.deadline && deadlinesByWeek[currentGameweek]) {
     cache.deadline = deadlinesByWeek[currentGameweek].toISOString();
   }
 
-  // Save back to gameweek cache
+  // ✅ Store updated cache
   gameweekCache[currentGameweek] = cache;
 
-  // Set current render state
+  // ✅ Update current global state
   currentFixtures = cache.fixtures;
   currentPredictions = cache.predictions;
   currentResults = cache.results;
@@ -419,6 +427,7 @@ async function loadGameweekData() {
     ? `Deadline: ${new Date(cache.deadline).toLocaleString()}`
     : "";
 
+  // ✅ Render all
   renderGameweek();
 }
 
