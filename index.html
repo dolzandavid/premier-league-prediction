@@ -363,53 +363,38 @@ async function loadGameweekData() {
   const fixturesContainer = document.getElementById("fixturesContainer");
   fixturesContainer.innerHTML = "";
 
-  // If already cached, use it
-if (gameweekCache[currentGameweek]) {
-  const { fixtures, predictions, results, deadline } = gameweekCache[currentGameweek];
-  currentFixtures = fixtures;
-  currentPredictions = predictions;
-  currentResults = results;
+  let cache = gameweekCache[currentGameweek] || {};
 
-  document.getElementById("gameweekDeadline").textContent = deadline
-    ? `Deadline: ${new Date(deadline).toLocaleString()}`
+  // Fetch fixtures if missing
+  if (!cache.fixtures) {
+    const q = query(collection(db, "fixtures"), where("gameweek", "==", currentGameweek));
+    const fixtureDocs = await getDocs(q);
+    cache.fixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
+  }
+
+  // Use preloaded predictions/results if available
+  cache.predictions = cache.predictions || {};
+  cache.results = cache.results || {};
+
+  // Use deadline from global cache if missing
+  if (!cache.deadline && deadlinesByWeek[currentGameweek]) {
+    cache.deadline = deadlinesByWeek[currentGameweek].toISOString();
+  }
+
+  // Save back to gameweek cache
+  gameweekCache[currentGameweek] = cache;
+
+  // Set current render state
+  currentFixtures = cache.fixtures;
+  currentPredictions = cache.predictions;
+  currentResults = cache.results;
+
+  document.getElementById("gameweekDeadline").textContent = cache.deadline
+    ? `Deadline: ${new Date(cache.deadline).toLocaleString()}`
     : "";
 
   renderGameweek();
-  return;
 }
-
-  // Load from Firestore
-  const q = query(collection(db, "fixtures"), where("gameweek", "==", currentGameweek));
-  const fixtureDocs = await getDocs(q);
-  const fixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
-
-  const resultsDoc = await getDoc(doc(db, "results", currentGameweek));
-  const predictionsDoc = await getDoc(doc(db, "predictions", currentGameweek));
-  const deadlineDoc = await getDoc(doc(db, "deadlines", currentGameweek));
-
-  const results = resultsDoc.exists() ? resultsDoc.data() : {};
-  const predictions = predictionsDoc.exists() ? predictionsDoc.data() : {};
-  const deadline = deadlineDoc.exists() ? deadlineDoc.data()?.deadline : null;
-
-// Save in cache
-gameweekCache[currentGameweek] = { fixtures, predictions, results, deadline };
-
-
-  document.getElementById("gameweekDeadline").textContent = deadline
-    ? `Deadline: ${new Date(deadline).toLocaleString()}`
-    : "";
-
-  // Cache for this gameweek
-  gameweekCache[currentGameweek] = { fixtures, predictions, results };
-
-  // Set current data for render
-  currentFixtures = fixtures;
-  currentPredictions = predictions;
-  currentResults = results;
-
-  renderGameweek();
-}
-
 
 function renderGameweek() {
   const fixturesContainer = document.getElementById("fixturesContainer");
