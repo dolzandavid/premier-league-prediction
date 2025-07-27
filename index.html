@@ -218,6 +218,9 @@ async function loadAllGameweekDataForLeaderboards() {
 
   // ✅ Only now is it safe to render
   renderLeaderboardsFromLocalCache();
+sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+sessionStorage.setItem("deadlinesByWeek", JSON.stringify(deadlinesByWeek));
+
 }
 
 async function determineClosestGameweek() {
@@ -843,6 +846,30 @@ window.addEventListener("DOMContentLoaded", async () => {
   const savedUser = localStorage.getItem("loggedInUser");
   const savedGameweek = localStorage.getItem("selectedGameweek");
 
+  // Restore gameweekCache from sessionStorage if it exists
+  const savedCache = sessionStorage.getItem("gameweekCache");
+  const savedDeadlines = sessionStorage.getItem("deadlinesByWeek");
+
+  if (savedCache) {
+    try {
+      gameweekCache = JSON.parse(savedCache);
+    } catch (e) {
+      console.error("Failed to parse cached gameweek data", e);
+    }
+  }
+
+  if (savedDeadlines) {
+    try {
+      const raw = JSON.parse(savedDeadlines);
+      // Convert string timestamps back to Date objects
+      for (const [week, dateStr] of Object.entries(raw)) {
+        deadlinesByWeek[week] = new Date(dateStr);
+      }
+    } catch (e) {
+      console.error("Failed to parse cached deadlines", e);
+    }
+  }
+
   if (savedUser && users[savedUser]) {
     currentUser = savedUser;
     currentGameweek = savedGameweek || "1";
@@ -859,17 +886,16 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     document.getElementById("loadingOverlay").classList.remove("hidden");
 
-    // 🧠 Only reload if the cache is empty (first visit)
+    // If cache is empty, do full Firestore load
     if (Object.keys(gameweekCache).length === 0) {
-      await loadAllGameweekDataForLeaderboards(); // loads all predictions/results
-      await populateGameweekDropdown();           // fills dropdown from Firestore
+      await loadAllGameweekDataForLeaderboards();
+      await populateGameweekDropdown();
     } else {
-      // ✅ Use cached data
       populateGameweekDropdownFromCache();
       renderLeaderboardsFromLocalCache();
     }
 
-    await loadGameweekData(); // renders selected gameweek (cached if available)
+    await loadGameweekData();
 
     document.getElementById("loadingOverlay").classList.add("hidden");
   }
