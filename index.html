@@ -130,6 +130,34 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+window.addEventListener("DOMContentLoaded", async () => {
+  const savedUser = localStorage.getItem("loggedInUser");
+  const savedGameweek = localStorage.getItem("selectedGameweek");
+
+  if (savedUser && users[savedUser]) {
+    currentUser = savedUser;
+    currentGameweek = savedGameweek || "1";
+
+    // Set up UI
+    loginSection.style.display = "none";
+    appDiv.style.display = "block";
+    welcomeUser.textContent = `Welcome, ${savedUser.charAt(0).toUpperCase() + savedUser.slice(1)}`;
+
+    if (savedUser === "david") {
+      document.getElementById("fixtureEditor").classList.remove("hidden");
+      document.getElementById("passwordResetSection").classList.remove("hidden");
+      populatePasswordResetDropdown();
+    }
+
+    document.getElementById("loadingOverlay").classList.remove("hidden");
+
+    await loadAllGameweekDataForLeaderboards(); // loads all predictions/results
+    await populateGameweekDropdown(); // rebuild dropdown
+    await loadGameweekData();         // loads currentGameweek
+    document.getElementById("loadingOverlay").classList.add("hidden");
+  }
+});
+
 const users = { david:"david123", katja:"katja123", mark:"mark123", jus:"jus123" };
 
 let currentUser="", currentGameweek="", deadlinesByWeek={};
@@ -302,6 +330,9 @@ document.getElementById("leaderboardWeekly").innerHTML = "";
     await populateGameweekDropdown();      // ✅ fills dropdown
     document.getElementById("loadingOverlay").classList.add("hidden");
     loadAllGameweekDataForLeaderboards();
+    
+    localStorage.setItem("loggedInUser", user);
+    localStorage.setItem("selectedGameweek", currentGameweek);
 
 
   } else {
@@ -309,7 +340,11 @@ document.getElementById("leaderboardWeekly").innerHTML = "";
   }
 };
 
-logoutBtn.onclick = () => location.reload();
+logoutBtn.onclick = () => {
+  localStorage.removeItem("loggedInUser");
+  localStorage.removeItem("selectedGameweek");
+  location.reload();
+};
 
 function getLogoUrl(teamName) {
   return `logos/${teamName
@@ -356,6 +391,7 @@ if (!currentGameweek) {
 
 document.getElementById("gameweekSelect").onchange = async (e) => {
   currentGameweek = e.target.value;
+  localStorage.setItem("selectedGameweek", currentGameweek);
   await loadGameweekData();
 };
 
