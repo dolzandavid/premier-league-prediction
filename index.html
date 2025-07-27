@@ -273,9 +273,7 @@ function populateGameweekDropdownFromCache() {
 }
 
 
-// Login handler
 loginBtn.onclick = async () => {
-  console.log("Login clicked");
   const user = document.getElementById("username").value;
   const pass = document.getElementById("password").value;
   const snap = await getDoc(doc(db, "passwords", user));
@@ -283,14 +281,13 @@ loginBtn.onclick = async () => {
 
   if (users[user] && pass === saved) {
     currentUser = user;
-      document.getElementById("leaderboardOverall").classList.add("hidden");
-  document.getElementById("leaderboardOverallLoading").classList.remove("hidden");
-document.getElementById("leaderboardOverall").innerHTML = "";
-document.getElementById("leaderboardWeekly").innerHTML = "";
-
     loginSection.style.display = "none";
     appDiv.style.display = "block";
     welcomeUser.textContent = `Welcome, ${user.charAt(0).toUpperCase() + user.slice(1)}`;
+    document.getElementById("leaderboardOverall").classList.add("hidden");
+    document.getElementById("leaderboardOverallLoading").classList.remove("hidden");
+    document.getElementById("leaderboardOverall").innerHTML = "";
+    document.getElementById("leaderboardWeekly").innerHTML = "";
 
     if (user === "david") {
       document.getElementById("fixtureEditor").classList.remove("hidden");
@@ -309,15 +306,24 @@ document.getElementById("leaderboardWeekly").innerHTML = "";
 
     document.getElementById("loadingOverlay").classList.remove("hidden");
 
-await determineClosestGameweek();
-await loadAllGameweekDataForLeaderboards(); // load all predictions/results first
-await populateGameweekDropdown();
-await loadGameweekData(); // now this will find data for currentGameweek
-document.getElementById("loadingOverlay").classList.add("hidden");
-    
+    await determineClosestGameweek();
+    await loadGameweekData(); // 🔹 Loads only current gameweek's data and displays it
+
+    populateGameweekDropdownFromCache(); // Populate dropdown from whatever cache exists so far
+
+    document.getElementById("loadingOverlay").classList.add("hidden");
+
+    // 🔹 Start background leaderboard loading (all gameweeks)
+    setTimeout(async () => {
+      await loadAllGameweekDataForLeaderboards(); // Fetch all gameweek data
+      renderLeaderboardsFromLocalCache();         // Populate leaderboard when done
+      // Save cache
+      sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+      sessionStorage.setItem("deadlinesByWeek", JSON.stringify(deadlinesByWeek));
+    }, 0);
+
     localStorage.setItem("loggedInUser", user);
     localStorage.setItem("selectedGameweek", currentGameweek);
-
 
   } else {
     alert("Invalid login");
