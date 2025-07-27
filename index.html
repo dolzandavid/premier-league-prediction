@@ -561,6 +561,7 @@ div.innerHTML = `
       sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
 
       renderGameweek();
+renderLeaderboardsFromLocalCache();
     });
 
     div.querySelector(".deleteRes")?.addEventListener("click", async () => {
@@ -575,6 +576,7 @@ gameweekCache[currentGameweek].results = currentResults;
 sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
 
       renderGameweek();
+renderLeaderboardsFromLocalCache();
     });
 
     div.querySelector(".editBtn")?.addEventListener("click", async () => {
