@@ -417,6 +417,8 @@ async function loadGameweekData() {
 
   // ✅ Store updated cache
   gameweekCache[currentGameweek] = cache;
+  sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+
 
   // ✅ Update current global state
   currentFixtures = cache.fixtures;
