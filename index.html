@@ -718,11 +718,18 @@ document.getElementById("addFixtureBtn").onclick = async () => {
   const home = document.getElementById("newHomeTeam").value.trim();
   const away = document.getElementById("newAwayTeam").value.trim();
   if (!home || !away) return alert("Enter both teams");
+
   const id = `${currentGameweek}_${home}_${away}_${Date.now()}`;
   await setDoc(doc(db, "fixtures", id), { home, away, gameweek: currentGameweek });
+
   document.getElementById("newHomeTeam").value = "";
   document.getElementById("newAwayTeam").value = "";
-  loadGameweekData();
+
+  // ✅ Clear the cache so fresh data is fetched
+  delete gameweekCache[currentGameweek];
+
+  // ✅ Load and re-render
+  await loadGameweekData();
 };
 
 document.getElementById("setDeadlineBtn").onclick = async () => {
