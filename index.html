@@ -67,17 +67,19 @@
       </div>
 
       <!-- Gameweek Selector -->
-<div class="mb-4 flex items-center gap-2">
-  <label for="gameweekSelect" class="font-medium">Gameweek:</label>
-  <select id="gameweekSelect" class="border p-2"></select>
-  <button id="refreshGameweekBtn" class="bg-yellow-400 hover:bg-yellow-500 text-white px-3 py-1 rounded text-sm">
-    Refresh
-  </button>
-  <span id="refreshStatus" class="text-green-600 text-sm ml-2 hidden">✅ Refreshed all predictions/results.</span>
-<span id="gameweekDeadline" class="ml-4 text-sm text-gray-600"></span>
+   <!-- Gameweek Selector + Refresh -->
+<div class="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+  <div class="flex items-center">
+    <label for="gameweekSelect" class="mr-2 font-medium">Gameweek:</label>
+    <select id="gameweekSelect" class="border p-2"></select>
+    <span id="gameweekDeadline" class="ml-4 text-sm text-gray-600"></span>
+  </div>
+  <div class="flex items-center gap-2">
+    <button id="refreshBtn" class="bg-yellow-400 hover:bg-yellow-500 text-white px-3 py-1 rounded text-sm">🔄 Refresh</button>
+    <span id="refreshStatus" class="text-sm text-green-600 hidden">Predictions and results refreshed</span>
+  </div>
 </div>
-
-      <!-- Fixture Editor (David) -->
+     <!-- Fixture Editor (David) -->
       <div id="fixtureEditor" class="mb-6 hidden">
         <h2 class="text-lg font-semibold mb-2">Edit Fixtures</h2>
         <div class="flex items-center space-x-2">
@@ -260,37 +262,21 @@ async function determineClosestGameweek() {
 
 async function populateGameweekDropdown() {
   const fixtureDocs = await getDocs(collection(db, "fixtures"));
-  const gameweeks = [...new Set(fixtureDocs.docs.map(d => d.data().gameweek))]
-    .filter(Boolean)
-    .sort((a, b) => +a - +b);
+  const weeks = [...new Set(fixtureDocs.docs.map(d => d.data().gameweek))]
+    .filter(Boolean).sort((a, b) => +a - +b);
 
-  const dropdown = document.getElementById("gameweekSelect");
-  dropdown.innerHTML = ""; // Clear just the dropdown options
-
-  gameweeks.forEach(gw => {
-    const option = document.createElement("option");
-    option.value = gw;
-    option.textContent = `Gameweek ${gw}`;
-    if (gw == currentGameweek) option.selected = true;
-    dropdown.appendChild(option);
-  });
+  const select = document.getElementById("gameweekSelect");
+  select.innerHTML = weeks.map(w =>
+    `<option value="${w}" ${w == currentGameweek ? "selected" : ""}>Gameweek ${w}</option>`
+  ).join("");
 }
 
 function populateGameweekDropdownFromCache() {
-  const gameweeks = Object.keys(gameweekCache)
-    .filter(gw => !isNaN(gw))
-    .sort((a, b) => +a - +b);
-
-  const dropdown = document.getElementById("gameweekSelect");
-  dropdown.innerHTML = ""; // Clear just the dropdown options
-
-  gameweeks.forEach(gw => {
-    const option = document.createElement("option");
-    option.value = gw;
-    option.textContent = `Gameweek ${gw}`;
-    if (gw == currentGameweek) option.selected = true;
-    dropdown.appendChild(option);
-  });
+  const weeks = Object.keys(gameweekCache).sort((a, b) => +a - +b);
+  const select = document.getElementById("gameweekSelect");
+  select.innerHTML = weeks.map(w =>
+    `<option value="${w}" ${w == currentGameweek ? "selected" : ""}>Gameweek ${w}</option>`
+  ).join("");
 }
 
 
@@ -406,38 +392,6 @@ document.getElementById("gameweekSelect").onchange = async (e) => {
   await loadGameweekData();
 };
 
-document.getElementById("refreshGameweekBtn").addEventListener("click", async () => {
-  if (!currentGameweek) return;
-
-  document.getElementById("loadingOverlay").classList.remove("hidden");
-
-  const [predSnap, resSnap] = await Promise.all([
-    getDoc(doc(db, "predictions", currentGameweek)),
-    getDoc(doc(db, "results", currentGameweek))
-  ]);
-
-  const predictions = predSnap.exists() ? predSnap.data() : {};
-  const results = resSnap.exists() ? resSnap.data() : {};
-
-  if (!gameweekCache[currentGameweek]) gameweekCache[currentGameweek] = {};
-  gameweekCache[currentGameweek].predictions = predictions;
-  gameweekCache[currentGameweek].results = results;
-
-  sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
-
-  currentPredictions = predictions;
-  currentResults = results;
-
-  renderGameweek();
-  renderLeaderboardsFromLocalCache();
-
-  document.getElementById("loadingOverlay").classList.add("hidden");
-
-  const status = document.getElementById("refreshStatus");
-  status.classList.remove("hidden");
-  setTimeout(() => status.classList.add("hidden"), 2000);
-});
-
 async function loadGameweekData() {
   const fixturesContainer = document.getElementById("fixturesContainer");
   fixturesContainer.innerHTML = "";
@@ -485,6 +439,32 @@ async function loadGameweekData() {
   // ✅ Render all
   renderGameweek();
 }
+
+document.getElementById("refreshBtn").addEventListener("click", async () => {
+  const [predSnap, resSnap] = await Promise.all([
+    getDoc(doc(db, "predictions", currentGameweek)),
+    getDoc(doc(db, "results", currentGameweek))
+  ]);
+
+  const predictions = predSnap.exists() ? predSnap.data() : {};
+  const results = resSnap.exists() ? resSnap.data() : {};
+
+  currentPredictions = predictions;
+  currentResults = results;
+
+  if (!gameweekCache[currentGameweek]) gameweekCache[currentGameweek] = {};
+  gameweekCache[currentGameweek].predictions = predictions;
+  gameweekCache[currentGameweek].results = results;
+
+  sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+
+  renderGameweek();
+
+  const status = document.getElementById("refreshStatus");
+  status.classList.remove("hidden");
+  setTimeout(() => status.classList.add("hidden"), 2500);
+});
+
 
 function renderGameweek() {
   const fixturesContainer = document.getElementById("fixturesContainer");
