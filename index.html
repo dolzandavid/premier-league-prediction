@@ -307,7 +307,8 @@ loginBtn.onclick = async () => {
     document.getElementById("loadingOverlay").classList.remove("hidden");
 
     await determineClosestGameweek();
-    await loadGameweekData(); // 🔹 Loads only current gameweek's data and displays it
+    subscribeToGameweek(currentGameweek);
+
 
     populateGameweekDropdownFromCache(); // Populate dropdown from whatever cache exists so far
 
@@ -376,61 +377,75 @@ if (!currentGameweek) {
   const gameweekSelect = document.getElementById("gameweekSelect");
   gameweekSelect.innerHTML = weeks.map(w => `<option value="${w}">Gameweek ${w}</option>`).join("");
   gameweekSelect.value = currentGameweek;
-  loadGameweekData();
+  subscribeToGameweek(currentGameweek);
 }
 
 document.getElementById("gameweekSelect").onchange = async (e) => {
   currentGameweek = e.target.value;
   localStorage.setItem("selectedGameweek", currentGameweek);
-  await loadGameweekData();
+  unsubscribeAll();
+  subscribeToGameweek(currentGameweek);
 };
 
-async function loadGameweekData() {
-  const fixturesContainer = document.getElementById("fixturesContainer");
-  fixturesContainer.innerHTML = "";
+let unsubscribeFns = [];
 
-  let cache = gameweekCache[currentGameweek] || {};
+function unsubscribeAll() {
+  unsubscribeFns.forEach(fn => fn());
+  unsubscribeFns = [];
+}
 
-  // ✅ Fetch fixtures if missing
-  if (!cache.fixtures) {
-    const q = query(collection(db, "fixtures"), where("gameweek", "==", currentGameweek));
-    const fixtureDocs = await getDocs(q);
-    cache.fixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
-  }
+function subscribeToGameweek(gameweek) {
+  unsubscribeAll(); // Remove previous listeners
 
-  // ✅ Fetch predictions if missing
-  if (!cache.predictions) {
-    const predSnap = await getDoc(doc(db, "predictions", currentGameweek));
-    cache.predictions = predSnap.exists() ? predSnap.data() : {};
-  }
+  // 🔄 Fixtures (real-time)
+  const qFixtures = query(collection(db, "fixtures"), where("gameweek", "==", gameweek));
+  const unsubFixtures = onSnapshot(qFixtures, snapshot => {
+    const fixtures = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    currentFixtures = fixtures;
+    if (!gameweekCache[gameweek]) gameweekCache[gameweek] = {};
+    gameweekCache[gameweek].fixtures = fixtures;
+    sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+    renderGameweek();
+  });
+  unsubscribeFns.push(unsubFixtures);
 
-  // ✅ Fetch results if missing
-  if (!cache.results) {
-    const resSnap = await getDoc(doc(db, "results", currentGameweek));
-    cache.results = resSnap.exists() ? resSnap.data() : {};
-  }
+  // 🔄 Predictions
+  const unsubPred = onSnapshot(doc(db, "predictions", gameweek), snap => {
+    const data = snap.exists() ? snap.data() : {};
+    currentPredictions = data;
+    if (!gameweekCache[gameweek]) gameweekCache[gameweek] = {};
+    gameweekCache[gameweek].predictions = data;
+    sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+    renderGameweek();
+  });
+  unsubscribeFns.push(unsubPred);
 
-  // ✅ Fetch deadline from global cache if available
-  if (!cache.deadline && deadlinesByWeek[currentGameweek]) {
-    cache.deadline = deadlinesByWeek[currentGameweek].toISOString();
-  }
+  // 🔄 Results
+  const unsubRes = onSnapshot(doc(db, "results", gameweek), snap => {
+    const data = snap.exists() ? snap.data() : {};
+    currentResults = data;
+    if (!gameweekCache[gameweek]) gameweekCache[gameweek] = {};
+    gameweekCache[gameweek].results = data;
+    sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+    renderGameweek();
+    renderLeaderboardsFromLocalCache();
+  });
+  unsubscribeFns.push(unsubRes);
 
-  // ✅ Store updated cache
-  gameweekCache[currentGameweek] = cache;
-  sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
-
-
-  // ✅ Update current global state
-  currentFixtures = cache.fixtures;
-  currentPredictions = cache.predictions;
-  currentResults = cache.results;
-
-  document.getElementById("gameweekDeadline").textContent = cache.deadline
-    ? `Deadline: ${new Date(cache.deadline).toLocaleString()}`
-    : "";
-
-  // ✅ Render all
-  renderGameweek();
+  // 🔄 Deadline
+  const unsubDeadline = onSnapshot(doc(db, "deadlines", gameweek), snap => {
+    if (snap.exists()) {
+      const deadline = snap.data().deadline;
+      deadlinesByWeek[gameweek] = new Date(deadline);
+      if (!gameweekCache[gameweek]) gameweekCache[gameweek] = {};
+      gameweekCache[gameweek].deadline = deadline;
+      sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+      sessionStorage.setItem("deadlinesByWeek", JSON.stringify(deadlinesByWeek));
+      document.getElementById("gameweekDeadline").textContent =
+        `Deadline: ${new Date(deadline).toLocaleString()}`;
+    }
+  });
+  unsubscribeFns.push(unsubDeadline);
 }
 
 function renderGameweek() {
@@ -764,7 +779,7 @@ document.getElementById("addFixtureBtn").onclick = async () => {
   delete gameweekCache[currentGameweek];
 
   // ✅ Load and re-render
-  await loadGameweekData();
+  subscribeToGameweek(currentGameweek);
 };
 
 document.getElementById("setDeadlineBtn").onclick = async () => {
@@ -781,7 +796,7 @@ gameweekCache[currentGameweek].deadline = deadline;
 sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
 sessionStorage.setItem("deadlinesByWeek", JSON.stringify(deadlinesByWeek));
 
-  loadGameweekData();
+  subscribeToGameweek(currentGameweek);
 };
 
 // Show history modal
@@ -935,7 +950,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       renderLeaderboardsFromLocalCache();
     }
 
-    await loadGameweekData();
+    subscribeToGameweek(currentGameweek);
 
     document.getElementById("loadingOverlay").classList.add("hidden");
   }
