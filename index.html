@@ -541,7 +541,12 @@ div.innerHTML = `
       const data = snap.exists() ? snap.data() : {};
       if (!data[fixture.id]) data[fixture.id] = {};
       data[fixture.id][currentUser] = { home: +h, away: +a };
-      await setDoc(doc(db, "predictions", currentGameweek), data);
+      import { updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+await updateDoc(doc(db, "predictions", currentGameweek), {
+  [`${fixture.id}.${currentUser}`]: { home: +h, away: +a }
+});
+
       currentPredictions[fixture.id] = { ...currentPredictions[fixture.id], [currentUser]: { home: +h, away: +a } };
       gameweekCache[currentGameweek].predictions = currentPredictions;
       sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
@@ -555,7 +560,12 @@ div.innerHTML = `
       const data = snap.data();
       delete data[fixture.id][currentUser];
       if (Object.keys(data[fixture.id]).length === 0) delete data[fixture.id];
-      await setDoc(doc(db, "predictions", currentGameweek), data);
+      import { updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+await updateDoc(doc(db, "predictions", currentGameweek), {
+  [`${fixture.id}.${currentUser}`]: { home: +h, away: +a }
+});
+
       if (currentPredictions[fixture.id]) {
         delete currentPredictions[fixture.id][currentUser];
       }
@@ -570,7 +580,12 @@ div.innerHTML = `
       const snap = await getDoc(doc(db, "results", currentGameweek));
       const data = snap.exists() ? snap.data() : {};
       data[fixture.id] = { home: +h, away: +a };
-      await setDoc(doc(db, "results", currentGameweek), data);
+      import { updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+await updateDoc(doc(db, "results", currentGameweek), {
+  [`${fixture.id}.${currentUser}`]: { home: +h, away: +a }
+});
+
       currentResults[fixture.id] = { home: +h, away: +a };
       gameweekCache[currentGameweek].results = currentResults;
       sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
@@ -585,7 +600,11 @@ renderLeaderboardsFromLocalCache();
       if (!snap.exists()) return;
       const data = snap.data();
       delete data[fixture.id];
-      await setDoc(doc(db, "results", currentGameweek), data);
+import { updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+await updateDoc(doc(db, "results", currentGameweek), {
+  [`${fixture.id}.${currentUser}`]: { home: +h, away: +a }
+});
       delete currentResults[fixture.id];
 gameweekCache[currentGameweek].results = currentResults;
 sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
