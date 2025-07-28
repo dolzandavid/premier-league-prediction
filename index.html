@@ -260,21 +260,37 @@ async function determineClosestGameweek() {
 
 async function populateGameweekDropdown() {
   const fixtureDocs = await getDocs(collection(db, "fixtures"));
-  const weeks = [...new Set(fixtureDocs.docs.map(d => d.data().gameweek))]
-    .filter(Boolean).sort((a, b) => +a - +b);
+  const gameweeks = [...new Set(fixtureDocs.docs.map(d => d.data().gameweek))]
+    .filter(Boolean)
+    .sort((a, b) => +a - +b);
 
-  const select = document.getElementById("gameweekSelect");
-  select.innerHTML = weeks.map(w =>
-    `<option value="${w}" ${w == currentGameweek ? "selected" : ""}>Gameweek ${w}</option>`
-  ).join("");
+  const dropdown = document.getElementById("gameweekSelect");
+  dropdown.innerHTML = ""; // Clear just the dropdown options
+
+  gameweeks.forEach(gw => {
+    const option = document.createElement("option");
+    option.value = gw;
+    option.textContent = `Gameweek ${gw}`;
+    if (gw == currentGameweek) option.selected = true;
+    dropdown.appendChild(option);
+  });
 }
 
 function populateGameweekDropdownFromCache() {
-  const weeks = Object.keys(gameweekCache).sort((a, b) => +a - +b);
-  const select = document.getElementById("gameweekSelect");
-  select.innerHTML = weeks.map(w =>
-    `<option value="${w}" ${w == currentGameweek ? "selected" : ""}>Gameweek ${w}</option>`
-  ).join("");
+  const gameweeks = Object.keys(gameweekCache)
+    .filter(gw => !isNaN(gw))
+    .sort((a, b) => +a - +b);
+
+  const dropdown = document.getElementById("gameweekSelect");
+  dropdown.innerHTML = ""; // Clear just the dropdown options
+
+  gameweeks.forEach(gw => {
+    const option = document.createElement("option");
+    option.value = gw;
+    option.textContent = `Gameweek ${gw}`;
+    if (gw == currentGameweek) option.selected = true;
+    dropdown.appendChild(option);
+  });
 }
 
 
