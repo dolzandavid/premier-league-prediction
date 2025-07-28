@@ -452,7 +452,6 @@ async function loadGameweekData() {
   gameweekCache[currentGameweek] = cache;
   sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
 
-
   // ✅ Update current global state
   currentFixtures = cache.fixtures;
   currentPredictions = cache.predictions;
@@ -462,7 +461,35 @@ async function loadGameweekData() {
     ? `Deadline: ${new Date(cache.deadline).toLocaleString()}`
     : "";
 
+  // ✅ Attach refresh button listener (safely, now that the DOM is ready)
+  const refreshBtn = document.getElementById("refreshBtn");
+  if (refreshBtn) {
+    refreshBtn.onclick = async () => {
+      const [predSnap, resSnap] = await Promise.all([
+        getDoc(doc(db, "predictions", currentGameweek)),
+        getDoc(doc(db, "results", currentGameweek))
+      ]);
 
+      const predictions = predSnap.exists() ? predSnap.data() : {};
+      const results = resSnap.exists() ? resSnap.data() : {};
+
+      currentPredictions = predictions;
+      currentResults = results;
+
+      if (!gameweekCache[currentGameweek]) gameweekCache[currentGameweek] = {};
+      gameweekCache[currentGameweek].predictions = predictions;
+      gameweekCache[currentGameweek].results = results;
+
+      sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+
+      renderGameweek();
+
+      const status = document.getElementById("refreshStatus");
+      status.classList.remove("hidden");
+      setTimeout(() => status.classList.add("hidden"), 2500);
+    };
+    console.log("✅ Refresh button initialized");
+  }
 
   // ✅ Render all
   renderGameweek();
@@ -954,11 +981,6 @@ window.addEventListener("DOMContentLoaded", async () => {
     loginSection.style.display = "none";
     appDiv.style.display = "block";
    // Attach refresh button listener once UI is visible
-document.getElementById("refreshBtn").onclick = async () => {
-  const [predSnap, resSnap] = await Promise.all([
-    getDoc(doc(db, "predictions", currentGameweek)),
-    getDoc(doc(db, "results", currentGameweek))
-  ]);
 
   const predictions = predSnap.exists() ? predSnap.data() : {};
   const results = resSnap.exists() ? resSnap.data() : {};
