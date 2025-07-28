@@ -67,19 +67,12 @@
       </div>
 
       <!-- Gameweek Selector -->
-   <!-- Gameweek Selector + Refresh -->
-<div class="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-  <div class="flex items-center">
-    <label for="gameweekSelect" class="mr-2 font-medium">Gameweek:</label>
-    <select id="gameweekSelect" class="border p-2"></select>
-    <span id="gameweekDeadline" class="ml-4 text-sm text-gray-600"></span>
-  </div>
-  <div class="flex items-center gap-2">
-    <button id="refreshBtn" class="bg-yellow-400 hover:bg-yellow-500 text-white px-3 py-1 rounded text-sm">🔄 Refresh</button>
-    <span id="refreshStatus" class="text-sm text-green-600 hidden">Predictions and results refreshed</span>
-  </div>
-</div>
-     <!-- Fixture Editor (David) -->
+      <div class="mb-4 flex items-center">
+        <label for="gameweekSelect" class="mr-2 font-medium">Gameweek:</label>
+        <select id="gameweekSelect" class="border p-2"></select>
+        <span id="gameweekDeadline" class="ml-4 text-sm text-gray-600"></span>
+      </div>
+      <!-- Fixture Editor (David) -->
       <div id="fixtureEditor" class="mb-6 hidden">
         <h2 class="text-lg font-semibold mb-2">Edit Fixtures</h2>
         <div class="flex items-center space-x-2">
@@ -290,32 +283,6 @@ loginBtn.onclick = async () => {
     currentUser = user;
     loginSection.style.display = "none";
     appDiv.style.display = "block";
-  // Attach refresh button listener once UI is visible
-document.getElementById("refreshBtn").onclick = async () => {
-  const [predSnap, resSnap] = await Promise.all([
-    getDoc(doc(db, "predictions", currentGameweek)),
-    getDoc(doc(db, "results", currentGameweek))
-  ]);
-
-  const predictions = predSnap.exists() ? predSnap.data() : {};
-  const results = resSnap.exists() ? resSnap.data() : {};
-
-  currentPredictions = predictions;
-  currentResults = results;
-
-  if (!gameweekCache[currentGameweek]) gameweekCache[currentGameweek] = {};
-  gameweekCache[currentGameweek].predictions = predictions;
-  gameweekCache[currentGameweek].results = results;
-
-  sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
-
-  renderGameweek();
-
-  const status = document.getElementById("refreshStatus");
-  status.classList.remove("hidden");
-  setTimeout(() => status.classList.add("hidden"), 2500);
-};
-
     welcomeUser.textContent = `Welcome, ${user.charAt(0).toUpperCase() + user.slice(1)}`;
     document.getElementById("leaderboardOverall").classList.add("hidden");
     document.getElementById("leaderboardOverallLoading").classList.remove("hidden");
@@ -452,6 +419,7 @@ async function loadGameweekData() {
   gameweekCache[currentGameweek] = cache;
   sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
 
+
   // ✅ Update current global state
   currentFixtures = cache.fixtures;
   currentPredictions = cache.predictions;
@@ -461,41 +429,9 @@ async function loadGameweekData() {
     ? `Deadline: ${new Date(cache.deadline).toLocaleString()}`
     : "";
 
-  // ✅ Attach refresh button listener (safely, now that the DOM is ready)
-  const refreshBtn = document.getElementById("refreshBtn");
-  if (refreshBtn) {
-    refreshBtn.onclick = async () => {
-      const [predSnap, resSnap] = await Promise.all([
-        getDoc(doc(db, "predictions", currentGameweek)),
-        getDoc(doc(db, "results", currentGameweek))
-      ]);
-
-      const predictions = predSnap.exists() ? predSnap.data() : {};
-      const results = resSnap.exists() ? resSnap.data() : {};
-
-      currentPredictions = predictions;
-      currentResults = results;
-
-      if (!gameweekCache[currentGameweek]) gameweekCache[currentGameweek] = {};
-      gameweekCache[currentGameweek].predictions = predictions;
-      gameweekCache[currentGameweek].results = results;
-
-      sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
-
-      renderGameweek();
-
-      const status = document.getElementById("refreshStatus");
-      status.classList.remove("hidden");
-      setTimeout(() => status.classList.add("hidden"), 2500);
-    };
-    console.log("✅ Refresh button initialized");
-  }
-
   // ✅ Render all
   renderGameweek();
 }
-
-
 
 function renderGameweek() {
   const fixturesContainer = document.getElementById("fixturesContainer");
@@ -980,28 +916,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     loginSection.style.display = "none";
     appDiv.style.display = "block";
-   // Attach refresh button listener once UI is visible
-
-  const predictions = predSnap.exists() ? predSnap.data() : {};
-  const results = resSnap.exists() ? resSnap.data() : {};
-
-  currentPredictions = predictions;
-  currentResults = results;
-
-  if (!gameweekCache[currentGameweek]) gameweekCache[currentGameweek] = {};
-  gameweekCache[currentGameweek].predictions = predictions;
-  gameweekCache[currentGameweek].results = results;
-
-  sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
-
-  renderGameweek();
-
-  const status = document.getElementById("refreshStatus");
-  status.classList.remove("hidden");
-  setTimeout(() => status.classList.add("hidden"), 2500);
-};
-
- welcomeUser.textContent = `Welcome, ${savedUser.charAt(0).toUpperCase() + savedUser.slice(1)}`;
+    welcomeUser.textContent = `Welcome, ${savedUser.charAt(0).toUpperCase() + savedUser.slice(1)}`;
 
     if (savedUser === "david") {
       document.getElementById("fixtureEditor").classList.remove("hidden");
