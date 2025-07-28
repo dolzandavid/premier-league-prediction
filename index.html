@@ -670,6 +670,33 @@ Object.values(gameweekCache).forEach(({ fixtures, predictions, results }) => {
 
 }
 
+document.addEventListener("visibilitychange", async () => {
+  if (!document.hidden && currentUser) {
+    console.log("🔄 Visibility change: Refreshing gameweek dropdown and data");
+    
+    // Reload latest gameweeks from Firestore
+    const fixtureDocs = await getDocs(collection(db, "fixtures"));
+    const weeks = [...new Set(fixtureDocs.docs.map(d => d.data().gameweek))]
+      .filter(Boolean).sort((a, b) => +a - +b);
+
+    // Update dropdown if anything changed
+    const select = document.getElementById("gameweekSelect");
+    const currentOptions = Array.from(select.options).map(opt => opt.value);
+    const newOptions = weeks.map(w => w.toString());
+
+    if (JSON.stringify(currentOptions) !== JSON.stringify(newOptions)) {
+      console.log("🔁 Updating gameweek dropdown due to new data");
+      select.innerHTML = weeks.map(w =>
+        `<option value="${w}" ${w == currentGameweek ? "selected" : ""}>Gameweek ${w}</option>`
+      ).join("");
+    }
+
+    // Optional: reload current gameweek data if needed
+    await loadGameweekData();
+  }
+});
+
+
 function calculatePoints(pred, res) {
   let pts = 0;
   if (pred.home === res.home) pts++;
