@@ -448,109 +448,136 @@ function subscribeToGameweek(gameweek) {
   unsubscribeFns.push(unsubDeadline);
 }
 
-function createScoreInput(value) {
-    const input = document.createElement("input");
-    input.type = "number";
-    input.min = "0";
-    input.value = value ?? "";
-    input.className = "w-12 px-2 py-1 border rounded text-center";
-    return input;
-  }
-
 function renderGameweek() {
-  console.log("🔄 Rendering gameweek:", currentGameweek, currentPredictions);
+  const fixturesContainer = document.getElementById("fixturesContainer");
+  fixturesContainer.innerHTML = "";
 
-  const container = document.getElementById("fixturesContainer");
-  container.innerHTML = ""; // 🧹 Clear all fixtures before re-rendering
+  for (const fixture of currentFixtures) {
+    const result = currentResults[fixture.id];
+    const pred = currentPredictions[fixture.id]?.[currentUser];
+    const isLocked = !!result;
+    const hasPrediction = !!pred;
 
-  const fixtures = currentFixtures || [];
-  const results = currentResults || {};
-  const predictions = currentPredictions || {};
-  const userPredictionData = predictions[currentUser] || {};
-  const deadline = deadlinesByWeek[currentGameweek];
+    const div = document.createElement("div");
+    div.className = "border p-3 my-2 bg-white rounded shadow";
 
-  fixtures.forEach((fixture) => {
-    const { id, homeTeam, awayTeam, gameweek } = fixture;
-    const result = results[id];
-    const userPrediction = userPredictionData[id];
+div.innerHTML = `
+  <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-2">
+    <div class="font-semibold flex flex-wrap items-center">
+      <span class="homeTeam flex items-center mr-2">
+        <img src="${getLogoUrl(fixture.home)}" alt="${fixture.home}" class="w-5 h-5 mr-1 inline" />
+        ${fixture.home}
+      </span>
+      <span class="mx-1">vs</span>
+      <span class="awayTeam flex items-center ml-2">
+        <img src="${getLogoUrl(fixture.away)}" alt="${fixture.away}" class="w-5 h-5 mr-1 inline" />
+        ${fixture.away}
+      </span>
+      <button class="historyBtn bg-yellow-100 hover:bg-yellow-200 px-2 py-1 rounded text-xs ml-2 mt-2 md:mt-0">
+        Fixture History
+      </button>
+    </div>
+    ${currentUser === "david" ? `
+      <div class="flex gap-2 flex-wrap">
+        <button class="editBtn bg-blue-100 hover:bg-blue-200 px-2 py-1 rounded text-sm">Edit</button>
+        <button class="deleteFixtureBtn bg-red-100 hover:bg-red-200 px-2 py-1 rounded text-sm">Delete</button>
+      </div>` : ""}
+  </div>
 
-    const hasResult = result && typeof result.home === "number" && typeof result.away === "number";
-    const hasUserPrediction = userPrediction && typeof userPrediction.home === "number" && typeof userPrediction.away === "number";
-
-    const fixtureCard = document.createElement("div");
-    fixtureCard.className = "bg-white shadow rounded p-4 mb-4";
-
-    const title = document.createElement("h3");
-    title.className = "text-lg font-semibold mb-2";
-    title.textContent = `${homeTeam} vs ${awayTeam}`;
-    fixtureCard.appendChild(title);
-
-    const logoRow = document.createElement("div");
-    logoRow.className = "flex items-center space-x-4 mb-2";
-
-    const homeLogo = createTeamLogoElement(homeTeam);
-    const awayLogo = createTeamLogoElement(awayTeam);
-    logoRow.appendChild(homeLogo);
-    logoRow.appendChild(awayLogo);
-    fixtureCard.appendChild(logoRow);
-
-    // 🟦 Prediction Block
-    const predictionRow = document.createElement("div");
-    predictionRow.className = "flex items-center space-x-2 mb-2";
-
-    if (!hasResult) {
-      const homeInput = createScoreInput(userPrediction?.home);
-      const awayInput = createScoreInput(userPrediction?.away);
-
-      predictionRow.appendChild(homeInput);
-      predictionRow.appendChild(document.createTextNode(":"));
-      predictionRow.appendChild(awayInput);
-
-      const saveButton = document.createElement("button");
-      saveButton.textContent = "Save Prediction";
-      saveButton.className = "ml-2 px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600";
-      saveButton.onclick = () => savePrediction(id, homeInput.value, awayInput.value);
-      predictionRow.appendChild(saveButton);
-    } else {
-      if (hasUserPrediction) {
-        predictionRow.innerHTML = `<span class="text-sm">Your Prediction: ${userPrediction.home}:${userPrediction.away}</span>`;
-      } else {
-        predictionRow.innerHTML = `<span class="text-sm text-gray-400">You didn't predict this fixture.</span>`;
+  <div class="mt-3 flex flex-col md:flex-row gap-4">
+    <div>
+      <label class="text-sm block mb-1">Your Prediction:</label>
+      ${
+        isLocked && pred
+          ? `<div class="inline-block bg-blue-100 border px-3 py-1 rounded">${pred.home} : ${pred.away}</div>`
+          : pred
+            ? `<div class="flex flex-wrap items-center gap-2">
+                <input type="number" min="0" class="border p-2 w-16 predHome" value="${pred?.home ?? ""}">
+                <span>:</span>
+                <input type="number" min="0" class="border p-2 w-16 predAway" value="${pred?.away ?? ""}">
+                <button class="savePred bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">Save</button>
+                <button class="deletePred bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm">Delete</button>
+              </div>`
+            : isLocked
+              ? `<div class="text-red-500 italic">Not submitted</div>`
+              : `<div class="flex flex-wrap items-center gap-2">
+                  <input type="number" min="0" class="border p-2 w-16 predHome" value="">
+                  <span>:</span>
+                  <input type="number" min="0" class="border p-2 w-16 predAway" value="">
+                  <button class="savePred bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">Save</button>
+                </div>`
       }
-    }
+    </div>
 
-    fixtureCard.appendChild(predictionRow);
-
-    // 🟩 Result
-    const resultRow = document.createElement("div");
-    if (hasResult) {
-      resultRow.innerHTML = `<strong>Result:</strong> ${result.home}:${result.away}`;
-    } else {
-      resultRow.innerHTML = `<em>Result not submitted yet</em>`;
-    }
-    fixtureCard.appendChild(resultRow);
-
-    // 🟧 Other Players' Predictions
-    if (hasUserPrediction || hasResult) {
-      const allPredictions = Object.entries(predictions)
-        .filter(([player, preds]) => player !== currentUser && preds[id])
-        .map(([player, preds]) => {
-          const p = preds[id];
-          const points = calculatePoints(p.home, p.away, result?.home, result?.away);
-          return `<div><strong>${capitalize(player)}</strong>: ${p.home}:${p.away}${hasResult ? ` (${points} pts)` : ""}</div>`;
-        });
-
-      if (allPredictions.length > 0) {
-        const othersDiv = document.createElement("div");
-        othersDiv.className = "mt-2 text-sm text-gray-700";
-        othersDiv.innerHTML = `<strong>Other Predictions:</strong>${allPredictions.join("")}`;
-        fixtureCard.appendChild(othersDiv);
+    <div>
+      ${
+        result
+          ? `<label class="text-sm block mb-1">Result:</label>
+             <div class="bg-gray-200 border px-3 py-1 rounded inline-block">${result.home} : ${result.away}</div>
+             ${currentUser === "david" ? `<button class="deleteRes bg-red-500 hover:bg-red-600 text-white px-3 py-1 ml-2 rounded text-sm">Delete</button>` : ""}`
+          : currentUser === "david"
+            ? `<label class="text-sm block mb-1">Result:</label>
+               <div class="flex flex-wrap items-center gap-2">
+                 <input type="number" min="0" class="border p-2 w-16 resHome" value="">
+                 <span>:</span>
+                 <input type="number" min="0" class="border p-2 w-16 resAway" value="">
+                 <button class="saveRes bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm">Save</button>
+               </div>`
+            : ""
       }
-    }
+    </div>
+  </div>
 
-    container.appendChild(fixtureCard);
-  });
-}
+  <div class="text-sm mt-3 playersPredictions"></div>
+`;
+
+    fixturesContainer.appendChild(div);
+
+    // Event listeners (unchanged)
+    div.querySelector(".savePred")?.addEventListener("click", async () => {
+      const h = div.querySelector(".predHome").value;
+      const a = div.querySelector(".predAway").value;
+      const snap = await getDoc(doc(db, "predictions", currentGameweek));
+      const data = snap.exists() ? snap.data() : {};
+      if (!data[fixture.id]) data[fixture.id] = {};
+      data[fixture.id][currentUser] = { home: +h, away: +a };
+      await setDoc(doc(db, "predictions", currentGameweek), data);
+      currentPredictions[fixture.id] = { ...currentPredictions[fixture.id], [currentUser]: { home: +h, away: +a } };
+      gameweekCache[currentGameweek].predictions = currentPredictions;
+      sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+
+      renderGameweek();
+    });
+
+    div.querySelector(".deletePred")?.addEventListener("click", async () => {
+      const snap = await getDoc(doc(db, "predictions", currentGameweek));
+      if (!snap.exists()) return;
+      const data = snap.data();
+      delete data[fixture.id][currentUser];
+      if (Object.keys(data[fixture.id]).length === 0) delete data[fixture.id];
+      await setDoc(doc(db, "predictions", currentGameweek), data);
+      if (currentPredictions[fixture.id]) {
+        delete currentPredictions[fixture.id][currentUser];
+      }
+      gameweekCache[currentGameweek].predictions = currentPredictions;
+      sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+      renderGameweek();
+    });
+
+    div.querySelector(".saveRes")?.addEventListener("click", async () => {
+      const h = div.querySelector(".resHome").value;
+      const a = div.querySelector(".resAway").value;
+      const snap = await getDoc(doc(db, "results", currentGameweek));
+      const data = snap.exists() ? snap.data() : {};
+      data[fixture.id] = { home: +h, away: +a };
+      await setDoc(doc(db, "results", currentGameweek), data);
+      currentResults[fixture.id] = { home: +h, away: +a };
+      gameweekCache[currentGameweek].results = currentResults;
+      sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+
+      renderGameweek();
+renderLeaderboardsFromLocalCache();
+    });
 
     div.querySelector(".deleteRes")?.addEventListener("click", async () => {
       if (!confirm("Are you sure you want to delete this result?")) return;
