@@ -436,10 +436,6 @@ async function loadGameweekData() {
     ? `Deadline: ${new Date(cache.deadline).toLocaleString()}`
     : "";
 
-  // ✅ Render all
-  renderGameweek();
-}
-
 document.getElementById("refreshBtn").addEventListener("click", async () => {
   const [predSnap, resSnap] = await Promise.all([
     getDoc(doc(db, "predictions", currentGameweek)),
@@ -464,6 +460,12 @@ document.getElementById("refreshBtn").addEventListener("click", async () => {
   status.classList.remove("hidden");
   setTimeout(() => status.classList.add("hidden"), 2500);
 });
+
+
+  // ✅ Render all
+  renderGameweek();
+}
+
 
 
 function renderGameweek() {
