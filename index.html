@@ -4,14 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Premier League Predictor</title>
-  
-
   <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <link rel="manifest" href="manifest.json" />
-
   <style>
     input[type="number"]::-webkit-inner-spin-button,
     input[type="number"]::-webkit-outer-spin-button {
@@ -20,7 +16,6 @@
   </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
-
 
 <!-- Loading Overlay -->
 <div id="loadingOverlay" class="fixed inset-0 bg-white bg-opacity-80 flex items-center justify-center z-50 hidden">
@@ -39,11 +34,6 @@
 </div>
 
   <div class="max-w-5xl mx-auto p-4">
-
-<button id="installButton" class="hidden fixed bottom-4 right-4 bg-blue-500 text-white px-4 py-2 rounded shadow">
-  Install App
-</button>
-
     <h1 class="text-2xl font-bold mb-4 text-center">Premier League Prediction Game</h1>
 
     <!-- LOGIN + CHANGE PASSWORD SECTION -->
@@ -670,33 +660,6 @@ Object.values(gameweekCache).forEach(({ fixtures, predictions, results }) => {
 
 }
 
-document.addEventListener("visibilitychange", async () => {
-  if (!document.hidden && currentUser) {
-    console.log("🔄 Visibility change: Refreshing gameweek dropdown and data");
-    
-    // Reload latest gameweeks from Firestore
-    const fixtureDocs = await getDocs(collection(db, "fixtures"));
-    const weeks = [...new Set(fixtureDocs.docs.map(d => d.data().gameweek))]
-      .filter(Boolean).sort((a, b) => +a - +b);
-
-    // Update dropdown if anything changed
-    const select = document.getElementById("gameweekSelect");
-    const currentOptions = Array.from(select.options).map(opt => opt.value);
-    const newOptions = weeks.map(w => w.toString());
-
-    if (JSON.stringify(currentOptions) !== JSON.stringify(newOptions)) {
-      console.log("🔁 Updating gameweek dropdown due to new data");
-      select.innerHTML = weeks.map(w =>
-        `<option value="${w}" ${w == currentGameweek ? "selected" : ""}>Gameweek ${w}</option>`
-      ).join("");
-    }
-
-    // Optional: reload current gameweek data if needed
-    await loadGameweekData();
-  }
-});
-
-
 function calculatePoints(pred, res) {
   let pts = 0;
   if (pred.home === res.home) pts++;
@@ -978,49 +941,6 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
-let deferredPrompt;
-const installButton = document.getElementById("installButton");
-
-window.addEventListener("beforeinstallprompt", (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  installButton.classList.remove("hidden");
-});
-
-installButton.addEventListener("click", async () => {
-  if (deferredPrompt) {
-    deferredPrompt.prompt();
-    const choiceResult = await deferredPrompt.userChoice;
-    if (choiceResult.outcome === "accepted") {
-      console.log("✅ User accepted the install prompt");
-    } else {
-      console.log("❌ User dismissed the install prompt");
-    }
-    deferredPrompt = null;
-    installButton.classList.add("hidden");
-  }
-});
-
-// ✅ Add fallback for mobile if no prompt was fired
-window.addEventListener("load", () => {
-  setTimeout(() => {
-    if (!deferredPrompt && /android|iphone/i.test(navigator.userAgent)) {
-      installButton.classList.remove("hidden");
-    }
-  }, 2000);
-});
-
 </script>
-
-<script>
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js")
-      .then(() => console.log("✅ Service Worker registered"))
-      .catch(err => console.error("Service Worker registration failed:", err));
-  });
-}
-</script>
-
 </body>
 </html>
