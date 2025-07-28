@@ -116,7 +116,7 @@
   </div>
   <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc, query, where, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc, query, where, onSnapshot, updateDoc, deletefield } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyA2WG0LUwLCDqmylgezCZ0aH5Q8vTaXTKU",
@@ -559,7 +559,7 @@ await updateDoc(doc(db, "predictions", currentGameweek), {
       delete data[fixture.id][currentUser];
       if (Object.keys(data[fixture.id]).length === 0) delete data[fixture.id];
 await updateDoc(doc(db, "predictions", currentGameweek), {
-  [`${fixture.id}.${currentUser}`]: { home: +h, away: +a }
+  [`${fixture.id}.${currentUser}`]: deleteField()
 });
 
       if (currentPredictions[fixture.id]) {
@@ -577,7 +577,7 @@ await updateDoc(doc(db, "predictions", currentGameweek), {
       const data = snap.exists() ? snap.data() : {};
       data[fixture.id] = { home: +h, away: +a };
 await updateDoc(doc(db, "results", currentGameweek), {
-  [`${fixture.id}.${currentUser}`]: { home: +h, away: +a }
+  [`${fixture.id}`]: { home: +h, away: +a }
 });
 
       currentResults[fixture.id] = { home: +h, away: +a };
@@ -595,7 +595,7 @@ renderLeaderboardsFromLocalCache();
       const data = snap.data();
       delete data[fixture.id];
 await updateDoc(doc(db, "results", currentGameweek), {
-  [`${fixture.id}.${currentUser}`]: { home: +h, away: +a }
+  [`${fixture.id}`]: deleteField()
 });
       delete currentResults[fixture.id];
 gameweekCache[currentGameweek].results = currentResults;
