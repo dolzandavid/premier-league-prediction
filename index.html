@@ -960,6 +960,10 @@ window.addEventListener("beforeinstallprompt", (e) => {
   installButton.classList.remove("hidden");
 });
 
+if (!deferredPrompt && /android|iphone/i.test(navigator.userAgent)) {
+  document.getElementById("installButton").classList.remove("hidden");
+}
+
 installButton.addEventListener("click", async () => {
   if (deferredPrompt) {
     deferredPrompt.prompt();
