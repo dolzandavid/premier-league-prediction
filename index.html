@@ -960,10 +960,6 @@ window.addEventListener("beforeinstallprompt", (e) => {
   installButton.classList.remove("hidden");
 });
 
-if (!deferredPrompt && /android|iphone/i.test(navigator.userAgent)) {
-  document.getElementById("installButton").classList.remove("hidden");
-}
-
 installButton.addEventListener("click", async () => {
   if (deferredPrompt) {
     deferredPrompt.prompt();
@@ -976,6 +972,15 @@ installButton.addEventListener("click", async () => {
     deferredPrompt = null;
     installButton.classList.add("hidden");
   }
+});
+
+// ✅ Add fallback for mobile if no prompt was fired
+window.addEventListener("load", () => {
+  setTimeout(() => {
+    if (!deferredPrompt && /android|iphone/i.test(navigator.userAgent)) {
+      installButton.classList.remove("hidden");
+    }
+  }, 2000);
 });
 
 </script>
