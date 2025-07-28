@@ -4,8 +4,26 @@ const urlsToCache = [
   "./index.html",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "./logos/", // include if you cache team logos
-  // add other CSS/JS/logo assets
+  "./logos/arsenal.png",
+  "./logos/aston-villa.png",
+  "./logos/bournemouth.png",
+  "./logos/brentford.png",
+  "./logos/brighton.png",
+  "./logos/burnley.png",
+  "./logos/chelsea.png",
+  "./logos/crystal-palace.png",
+  "./logos/everton.png",
+  "./logos/fulham.png",
+  "./logos/leeds.png",
+  "./logos/liverpool.png",
+  "./logos/man-city.png",
+  "./logos/man-utd.png",
+  "./logos/newcastle.png",
+  "./logos/nottm-forest.png",
+  "./logos/spurs.png",
+  "./logos/sunderland.png",
+  "./logos/west-ham.png",
+  "./logos/wolves.png"  
 ];
 
 self.addEventListener("install", (event) => {
