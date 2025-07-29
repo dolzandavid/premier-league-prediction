@@ -410,32 +410,26 @@ function subscribeToGameweek(gameweek) {
   unsubscribeFns.push(unsubFixtures);
 
   // 🔄 Predictions
-const unsubPred = onSnapshot(doc(db, "predictions", gameweek), snap => {
-  const data = snap.exists() ? snap.data() : {};
-  currentPredictions = { ...currentPredictions, [gameweek]: data }; // ✅ preserve other gameweeks
-
-  if (!gameweekCache[gameweek]) gameweekCache[gameweek] = {};
-  gameweekCache[gameweek].predictions = data;
-
-  sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
-
-  renderGameweek();
-});
+  const unsubPred = onSnapshot(doc(db, "predictions", gameweek), snap => {
+    const data = snap.exists() ? snap.data() : {};
+    currentPredictions = data;
+    if (!gameweekCache[gameweek]) gameweekCache[gameweek] = {};
+    gameweekCache[gameweek].predictions = data;
+    sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+    renderGameweek();
+  });
   unsubscribeFns.push(unsubPred);
 
   // 🔄 Results
-const unsubRes = onSnapshot(doc(db, "results", gameweek), snap => {
-  const data = snap.exists() ? snap.data() : {};
-  currentResults = { ...currentResults, [gameweek]: data }; // ✅ merge instead of replace
-
-  if (!gameweekCache[gameweek]) gameweekCache[gameweek] = {};
-  gameweekCache[gameweek].results = data;
-
-  sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
-
-  renderGameweek();
-  renderLeaderboardsFromLocalCache(); // ✅ live leaderboard update
-});
+  const unsubRes = onSnapshot(doc(db, "results", gameweek), snap => {
+    const data = snap.exists() ? snap.data() : {};
+    currentResults = data;
+    if (!gameweekCache[gameweek]) gameweekCache[gameweek] = {};
+    gameweekCache[gameweek].results = data;
+    sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+    renderGameweek();
+    renderLeaderboardsFromLocalCache();
+  });
   unsubscribeFns.push(unsubRes);
 
   // 🔄 Deadline
