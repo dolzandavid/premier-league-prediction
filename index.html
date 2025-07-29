@@ -455,16 +455,16 @@ function subscribeToGameweek(gameweek) {
   unsubscribeFns.push(unsubPred);
 
   // 🔄 Results
-  const unsubRes = onSnapshot(doc(db, "results", gameweek), snap => {
-    const data = snap.exists() ? snap.data() : {};
-    currentResults = data;
-    if (!gameweekCache[gameweek]) gameweekCache[gameweek] = {};
-    gameweekCache[gameweek].results = data;
-    sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
-    renderGameweek();
-    renderLeaderboardsFromLocalCache();
-  });
-  unsubscribeFns.push(unsubRes);
+const unsubRes = onSnapshot(doc(db, "results", gameweek), snap => {
+  const data = snap.exists() ? snap.data() : {};
+  if (!gameweekCache[gameweek]) gameweekCache[gameweek] = {};
+  gameweekCache[gameweek].results = data;
+
+  sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+  console.log("📡 Result update for CURRENT GW", gameweek);
+  renderLeaderboardsFromLocalCache();
+});
+unsubscribeFns.push(unsubRes);
 
   // 🔄 Deadline
   const unsubDeadline = onSnapshot(doc(db, "deadlines", gameweek), snap => {
