@@ -350,14 +350,27 @@ async function subscribeToAllResultsExceptCurrent(current) {
     .filter(w => w && w !== current);
 
   for (const week of allWeeks) {
-    const unsubRes = onSnapshot(doc(db, "results", week), snap => {
+    const unsubRes = onSnapshot(doc(db, "results", week), async (snap) => {
       const data = snap.exists() ? snap.data() : {};
+
+      // Ensure cache entry exists
       if (!gameweekCache[week]) gameweekCache[week] = {};
+
+      // ✅ Cache results
       gameweekCache[week].results = data;
 
+      // ✅ Cache fixtures if not already done
+      if (!gameweekCache[week].fixtures) {
+        const fixturesForWeek = fixtureDocs.docs
+          .filter(d => d.data().gameweek === week)
+          .map(d => ({ id: d.id, ...d.data() }));
+        gameweekCache[week].fixtures = fixturesForWeek;
+      }
+
+      // ✅ Save to sessionStorage
       sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
 
-      // 🔄 Re-render the overall leaderboard only
+      // ✅ Force leaderboard update
       renderLeaderboardsFromLocalCache();
     });
 
