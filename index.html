@@ -308,6 +308,8 @@ loginBtn.onclick = async () => {
 
     await determineClosestGameweek();
     subscribeToGameweek(currentGameweek);
+console.log("✅ Subscribing to background results...");
+console.log("📅 currentGameweek =", currentGameweek);
     subscribeToAllResultsExceptCurrent(currentGameweek);  // ✅ Live leaderboard updates
 
     populateGameweekDropdownFromCache(); // Populate dropdown from whatever cache exists so far
@@ -345,32 +347,30 @@ function getLogoUrl(teamName) {
 }
 
 async function subscribeToAllResultsExceptCurrent(current) {
-  const fixtureDocs = await getDocs(collection(db, "fixtures"));
-  const allWeeks = [...new Set(fixtureDocs.docs.map(d => d.data().gameweek))]
+  console.log("🔄 Setting up background result subscriptions...");
+
+  const fixtureSnapshot = await getDocs(collection(db, "fixtures"));
+  const allWeeks = [...new Set(fixtureSnapshot.docs.map(d => d.data().gameweek))]
     .filter(w => w && w !== current);
 
   for (const week of allWeeks) {
     const unsubRes = onSnapshot(doc(db, "results", week), async (snap) => {
       const data = snap.exists() ? snap.data() : {};
+      console.log("📡 Result update for GW", week, data);
 
-      // Ensure cache entry exists
       if (!gameweekCache[week]) gameweekCache[week] = {};
-
-      // ✅ Cache results
       gameweekCache[week].results = data;
 
-      // ✅ Cache fixtures if not already done
+      // Add fixtures if not yet cached
       if (!gameweekCache[week].fixtures) {
-        const fixturesForWeek = fixtureDocs.docs
-          .filter(d => d.data().gameweek === week)
-          .map(d => ({ id: d.id, ...d.data() }));
-        gameweekCache[week].fixtures = fixturesForWeek;
+        const weekFixtures = fixtureSnapshot.docs
+          .filter(doc => doc.data().gameweek === week)
+          .map(doc => ({ id: doc.id, ...doc.data() }));
+        gameweekCache[week].fixtures = weekFixtures;
       }
 
-      // ✅ Save to sessionStorage
       sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
-
-      // ✅ Force leaderboard update
+      console.log("🧮 Re-rendering leaderboard...");
       renderLeaderboardsFromLocalCache();
     });
 
