@@ -423,7 +423,7 @@ function subscribeToGameweek(gameweek) {
   // 🔄 Results
   const unsubRes = onSnapshot(doc(db, "results", gameweek), snap => {
     const data = snap.exists() ? snap.data() : {};
-    currentResults = { ...currentResults, [gameweek]: data }; // ✅ merge instead of replace
+    currentResults = data;
     if (!gameweekCache[gameweek]) gameweekCache[gameweek] = {};
     gameweekCache[gameweek].results = data;
     sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
