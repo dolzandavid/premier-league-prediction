@@ -308,7 +308,7 @@ loginBtn.onclick = async () => {
 
     await determineClosestGameweek();
     subscribeToGameweek(currentGameweek);
-
+    subscribeToAllOtherResults(currentGameweek);   // background leaderboard updates
 
     populateGameweekDropdownFromCache(); // Populate dropdown from whatever cache exists so far
 
@@ -342,6 +342,21 @@ function getLogoUrl(teamName) {
     .toLowerCase()
     .replace(/[^a-z0-9 ]/g, "")  // remove punctuation like apostrophes
     .replace(/\s+/g, "-")}.png`; // replace spaces with dashes
+}
+
+async function subscribeToAllOtherResults(current) {
+  const weeks = Object.keys(gameweekCache).filter(w => w !== current);
+
+  for (const week of weeks) {
+    const unsubRes = onSnapshot(doc(db, "results", week), snap => {
+      const data = snap.exists() ? snap.data() : {};
+      if (!gameweekCache[week]) gameweekCache[week] = {};
+      gameweekCache[week].results = data;
+      sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+      renderLeaderboardsFromLocalCache(); // 🔁 Update leaderboard
+    });
+    unsubscribeFns.push(unsubRes);
+  }
 }
 
 async function loadGameweeks() {
