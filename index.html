@@ -605,22 +605,36 @@ sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
 renderLeaderboardsFromLocalCache();
     });
 
-    div.querySelector(".editBtn")?.addEventListener("click", async () => {
-      const newHome = prompt("New home team name:", fixture.home);
-      const newAway = prompt("New away team name:", fixture.away);
-      if (newHome && newAway) {
-        await setDoc(doc(db, "fixtures", fixture.id), { home: newHome, away: newAway, gameweek: currentGameweek });
-        fixture.home = newHome;
-        fixture.away = newAway;
-        renderGameweek();
-      }
-    });
+div.querySelector(".editBtn")?.addEventListener("click", async () => {
+  const newHome = prompt("New home team name:", fixture.home)?.trim();
+  const newAway = prompt("New away team name:", fixture.away)?.trim();
 
-    div.querySelector(".deleteFixtureBtn")?.addEventListener("click", async () => {
-      await deleteDoc(doc(db, "fixtures", fixture.id));
-      currentFixtures = currentFixtures.filter(f => f.id !== fixture.id);
-      renderGameweek();
-    });
+  if (!newHome || !newAway) return;
+
+  await setDoc(doc(db, "fixtures", fixture.id), {
+    home: newHome,
+    away: newAway,
+    gameweek: currentGameweek // ✅ required for real-time updates to work
+  });
+
+  fixture.home = newHome;
+  fixture.away = newAway;
+
+  renderGameweek(); // ✅ Update local UI immediately
+});
+
+div.querySelector(".deleteFixtureBtn")?.addEventListener("click", async () => {
+  if (!confirm("Are you sure you want to delete this fixture?")) return;
+
+  await deleteDoc(doc(db, "fixtures", fixture.id));
+
+  // Update local cache and UI
+  currentFixtures = currentFixtures.filter(f => f.id !== fixture.id);
+  gameweekCache[currentGameweek].fixtures = currentFixtures;
+  sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+
+  renderGameweek();
+});
 
     // Show predictions from others ONLY if this user submitted one or the fixture is not locked
     const predDiv = div.querySelector(".playersPredictions");
@@ -781,33 +795,43 @@ document.getElementById("addFixtureBtn").onclick = async () => {
   if (!home || !away) return alert("Enter both teams");
 
   const id = `${currentGameweek}_${home}_${away}_${Date.now()}`;
-  await setDoc(doc(db, "fixtures", id), { home, away, gameweek: currentGameweek });
+  await setDoc(doc(db, "fixtures", id), {
+    home,
+    away,
+    gameweek: currentGameweek // ✅ Required for onSnapshot to work
+  });
 
+  // Clear input fields
   document.getElementById("newHomeTeam").value = "";
   document.getElementById("newAwayTeam").value = "";
 
-  // ✅ Clear the cache so fresh data is fetched
+  // ✅ No need to re-subscribe — snapshot will pick up the change
+  // Just clear cache and re-render locally
   delete gameweekCache[currentGameweek];
 
-  // ✅ Load and re-render
-  subscribeToGameweek(currentGameweek);
+  renderGameweek(); // 👈 You may want this for instant UI feedback
 };
 
 document.getElementById("setDeadlineBtn").onclick = async () => {
   const deadline = document.getElementById("deadlineInput").value;
   if (!deadline) return;
+
+  // ✅ Save to Firestore (this will trigger onSnapshot)
   await setDoc(doc(db, "deadlines", currentGameweek), { deadline });
-deadlinesByWeek[currentGameweek] = new Date(deadline);
 
-// ✅ Also update gameweekCache
-if (!gameweekCache[currentGameweek]) gameweekCache[currentGameweek] = {};
-gameweekCache[currentGameweek].deadline = deadline;
+  // ✅ Update local cache
+  deadlinesByWeek[currentGameweek] = new Date(deadline);
 
-// ✅ Persist to sessionStorage
-sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
-sessionStorage.setItem("deadlinesByWeek", JSON.stringify(deadlinesByWeek));
+  if (!gameweekCache[currentGameweek]) gameweekCache[currentGameweek] = {};
+  gameweekCache[currentGameweek].deadline = deadline;
 
-  subscribeToGameweek(currentGameweek);
+  // ✅ Save to sessionStorage
+  sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+  sessionStorage.setItem("deadlinesByWeek", JSON.stringify(deadlinesByWeek));
+
+  // ❌ DON'T re-subscribe – live updates are automatic
+  // ✅ Just update UI locally (optional)
+  renderGameweek();
 };
 
 // Show history modal
