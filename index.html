@@ -181,7 +181,7 @@ async function preloadAllGameweeks() {
   for (let week of weeks) {
     const fixtures = allFixtures.filter(f => f.gameweek === week);
     const predictionsSnap = await getDoc(doc(db, "predictions", week));
-    const resultsSnap = await getDoc(doc(db, "results", String(week)));
+    const resultsSnap = await getDoc(doc(db, "results", week));
     const predictions = predictionsSnap.exists() ? predictionsSnap.data() : {};
     const results = resultsSnap.exists() ? resultsSnap.data() : {};
     const deadline = deadlineMap[week] || null;
@@ -208,7 +208,7 @@ async function loadAllGameweekDataForLeaderboards() {
 
     const [predSnap, resSnap] = await Promise.all([
       getDoc(doc(db, "predictions", week)),
-      getDoc(doc(db, "results", String(week)))
+      getDoc(doc(db, "results", week))
     ]);
 
     gameweekCache[week].fixtures = fixtures;
@@ -308,9 +308,7 @@ loginBtn.onclick = async () => {
 
     await determineClosestGameweek();
     subscribeToGameweek(currentGameweek);
-console.log("✅ Subscribing to background results...");
-console.log("📅 currentGameweek =", currentGameweek);
-    subscribeToAllResultsExceptCurrent(currentGameweek);  // ✅ Live leaderboard updates
+
 
     populateGameweekDropdownFromCache(); // Populate dropdown from whatever cache exists so far
 
@@ -344,38 +342,6 @@ function getLogoUrl(teamName) {
     .toLowerCase()
     .replace(/[^a-z0-9 ]/g, "")  // remove punctuation like apostrophes
     .replace(/\s+/g, "-")}.png`; // replace spaces with dashes
-}
-
-async function subscribeToAllResultsExceptCurrent(current) {
-  console.log("🔄 Setting up background result subscriptions...");
-
-  const fixtureSnapshot = await getDocs(collection(db, "fixtures"));
-  const allWeeks = [...new Set(fixtureSnapshot.docs.map(d => d.data().gameweek))]
-    .filter(w => w && w !== current);
-
-  for (const week of allWeeks) {
-    const unsubRes = onSnapshot(doc(db, "results", String(week)), async (snap) => {
-      const data = snap.exists() ? snap.data() : {};
-      console.log("📡 Result update for GW", week, data);
-
-      if (!gameweekCache[week]) gameweekCache[week] = {};
-      gameweekCache[week].results = data;
-
-      // Add fixtures if not yet cached
-      if (!gameweekCache[week].fixtures) {
-        const weekFixtures = fixtureSnapshot.docs
-          .filter(doc => doc.data().gameweek === week)
-          .map(doc => ({ id: doc.id, ...doc.data() }));
-        gameweekCache[week].fixtures = weekFixtures;
-      }
-
-      sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
-      console.log("🧮 Re-rendering leaderboard...");
-      renderLeaderboardsFromLocalCache();
-    });
-
-    unsubscribeFns.push(unsubRes);
-  }
 }
 
 async function loadGameweeks() {
@@ -455,16 +421,16 @@ function subscribeToGameweek(gameweek) {
   unsubscribeFns.push(unsubPred);
 
   // 🔄 Results
-const unsubRes = onSnapshot(doc(db, "results", gameweek), snap => {
-  const data = snap.exists() ? snap.data() : {};
-  if (!gameweekCache[gameweek]) gameweekCache[gameweek] = {};
-  gameweekCache[gameweek].results = data;
-
-  sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
-  console.log("📡 Result update for CURRENT GW", gameweek);
-  renderLeaderboardsFromLocalCache();
-});
-unsubscribeFns.push(unsubRes);
+  const unsubRes = onSnapshot(doc(db, "results", gameweek), snap => {
+    const data = snap.exists() ? snap.data() : {};
+    currentResults = data;
+    if (!gameweekCache[gameweek]) gameweekCache[gameweek] = {};
+    gameweekCache[gameweek].results = data;
+    sessionStorage.setItem("gameweekCache", JSON.stringify(gameweekCache));
+    renderGameweek();
+    renderLeaderboardsFromLocalCache();
+  });
+  unsubscribeFns.push(unsubRes);
 
   // 🔄 Deadline
   const unsubDeadline = onSnapshot(doc(db, "deadlines", gameweek), snap => {
@@ -607,10 +573,10 @@ await updateDoc(doc(db, "predictions", currentGameweek), {
     div.querySelector(".saveRes")?.addEventListener("click", async () => {
       const h = div.querySelector(".resHome").value;
       const a = div.querySelector(".resAway").value;
-      const snap = await getDoc(doc(db, "results", String(currentGameweek)));
+      const snap = await getDoc(doc(db, "results", currentGameweek));
       const data = snap.exists() ? snap.data() : {};
       data[fixture.id] = { home: +h, away: +a };
-await updateDoc(doc(db, "results", String(currentGameweek)), {
+await updateDoc(doc(db, "results", currentGameweek), {
   [`${fixture.id}`]: { home: +h, away: +a }
 });
 
@@ -624,11 +590,11 @@ renderLeaderboardsFromLocalCache();
 
     div.querySelector(".deleteRes")?.addEventListener("click", async () => {
       if (!confirm("Are you sure you want to delete this result?")) return;
-      const snap = await getDoc(doc(db, "results", String(currentGameweek)));
+      const snap = await getDoc(doc(db, "results", currentGameweek));
       if (!snap.exists()) return;
       const data = snap.data();
       delete data[fixture.id];
-await updateDoc(doc(db, "results", String(currentGameweek)), {
+await updateDoc(doc(db, "results", currentGameweek), {
   [`${fixture.id}`]: deleteField()
 });
       delete currentResults[fixture.id];
