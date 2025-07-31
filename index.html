@@ -188,6 +188,15 @@ async function preloadAllGameweeks() {
 
     gameweekCache[week] = { fixtures, predictions, results, deadline };
   }
+// Set initial gameweek to the one that was selected (or defaulted earlier)
+const data = gameweekCache[currentGameweek];
+if (data) {
+  currentFixtures = data.fixtures || [];
+  currentPredictions = data.predictions || {};
+  currentResults = data.results || {};
+  renderGameweek(); // ✅ this was missing!
+}
+
 }
 
 async function loadAllGameweekDataForLeaderboards() {
