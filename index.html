@@ -188,15 +188,6 @@ async function preloadAllGameweeks() {
 
     gameweekCache[week] = { fixtures, predictions, results, deadline };
   }
-// Set initial gameweek to the one that was selected (or defaulted earlier)
-const data = gameweekCache[currentGameweek];
-if (data) {
-  currentFixtures = data.fixtures || [];
-  currentPredictions = data.predictions || {};
-  currentResults = data.results || {};
-  renderGameweek(); // ✅ this was missing!
-}
-
 }
 
 async function loadAllGameweekDataForLeaderboards() {
@@ -645,11 +636,11 @@ div.querySelector(".deleteFixtureBtn")?.addEventListener("click", async () => {
   renderGameweek();
 });
 
-    // Show predictions from others ONLY if this user submitted one
+    // Show predictions from others ONLY if this user submitted one or the fixture is not locked
     const predDiv = div.querySelector(".playersPredictions");
     const all = currentPredictions[fixture.id] || {};
-   const showOthers = Object.keys(all).length > 0;
 
+    const showOthers = hasPrediction;
 
     if (showOthers && Object.keys(all).length > 0) {
       let html = `
@@ -665,26 +656,9 @@ div.querySelector(".deleteFixtureBtn")?.addEventListener("click", async () => {
             <tbody>
       `;
       for (let player in all) {
-const p = all[player];
-if (!p || typeof p.home !== "number" || typeof p.away !== "number") continue; // skip players with no prediction
-
-const res = currentResults[fixture.id];
-const resultEntered = res && typeof res.home === "number" && typeof res.away === "number";
-
-let pts = resultEntered ? calculatePoints(p, res) : "-";
-
-let predictionDisplay = "🔒";
-let predictionClass = "text-gray-400 italic";
-let tooltip = 'title="Hidden until result is submitted"';
-
-console.log("Fixture:", fixture.id, "| Player:", player, "| res =", res);
-if (player === currentUser || resultEntered) {
-  predictionDisplay = `${p.home}:${p.away}`;
-  predictionClass = "";
-  tooltip = "";
-}
-
-
+        const p = all[player];
+        const res = currentResults[fixture.id];
+        let pts = res ? calculatePoints(p, res) : "-";
 
         let ptsBgClass = "bg-gray-400";
         if (typeof pts === "number") {
@@ -696,9 +670,7 @@ if (player === currentUser || resultEntered) {
         html += `
           <tr class="hover:bg-gray-50">
             <td class="border-t px-2 py-1">${player.charAt(0).toUpperCase() + player.slice(1)}</td>
-            <td class="border-t px-2 py-1">
-              <span class="${predictionClass}" ${tooltip}>${predictionDisplay}</span>
-            </td>
+            <td class="border-t px-2 py-1">${p.home}:${p.away}</td>
             <td class="border-t px-2 py-1">
               <span class="px-2 py-1 rounded-full text-white text-xs ${ptsBgClass}">${pts}</span>
             </td>
@@ -709,8 +681,6 @@ if (player === currentUser || resultEntered) {
     } else {
       predDiv.innerHTML = "";
     }
-
-
   }
 
 // Rebuild merged predictions/results/fixtures from all cached gameweeks
