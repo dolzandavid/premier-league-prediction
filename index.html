@@ -636,10 +636,9 @@ div.querySelector(".deleteFixtureBtn")?.addEventListener("click", async () => {
   renderGameweek();
 });
 
-    // Show predictions from others ONLY if this user submitted one or the fixture is not locked
+    // Show predictions from others ONLY if this user submitted one
     const predDiv = div.querySelector(".playersPredictions");
     const all = currentPredictions[fixture.id] || {};
-
     const showOthers = hasPrediction;
 
     if (showOthers && Object.keys(all).length > 0) {
@@ -660,6 +659,11 @@ div.querySelector(".deleteFixtureBtn")?.addEventListener("click", async () => {
         const res = currentResults[fixture.id];
         let pts = res ? calculatePoints(p, res) : "-";
 
+        let predictionDisplay = "*:*";
+        if (res || player === currentUser) {
+          predictionDisplay = `${p.home}:${p.away}`;
+        }
+
         let ptsBgClass = "bg-gray-400";
         if (typeof pts === "number") {
           if (pts === 5) ptsBgClass = "bg-green-600";
@@ -670,7 +674,11 @@ div.querySelector(".deleteFixtureBtn")?.addEventListener("click", async () => {
         html += `
           <tr class="hover:bg-gray-50">
             <td class="border-t px-2 py-1">${player.charAt(0).toUpperCase() + player.slice(1)}</td>
-            <td class="border-t px-2 py-1">${p.home}:${p.away}</td>
+            <td class="border-t px-2 py-1">
+              <span ${!res && player !== currentUser ? 'class="text-gray-400 italic" title="Hidden until result is submitted"' : ''}>
+                ${predictionDisplay}
+              </span>
+            </td>
             <td class="border-t px-2 py-1">
               <span class="px-2 py-1 rounded-full text-white text-xs ${ptsBgClass}">${pts}</span>
             </td>
@@ -681,6 +689,8 @@ div.querySelector(".deleteFixtureBtn")?.addEventListener("click", async () => {
     } else {
       predDiv.innerHTML = "";
     }
+
+
   }
 
 // Rebuild merged predictions/results/fixtures from all cached gameweeks
