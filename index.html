@@ -659,7 +659,7 @@ div.querySelector(".deleteFixtureBtn")?.addEventListener("click", async () => {
         const res = currentResults[fixture.id];
         let pts = res ? calculatePoints(p, res) : "-";
 
-        let predictionDisplay = "*:*";
+        let predictionDisplay = "🔒";
         if (res || player === currentUser) {
           predictionDisplay = `${p.home}:${p.away}`;
         }
