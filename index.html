@@ -675,13 +675,6 @@ if (player === currentUser || resultEntered) {
 }
 
 
-        predictionClass = (!res && player !== currentUser)
-          ? 'text-gray-400 italic'
-          : '';
-
-        let tooltip = (!res && player !== currentUser)
-          ? 'title="Hidden until result is submitted"'
-          : '';
 
         let ptsBgClass = "bg-gray-400";
         if (typeof pts === "number") {
