@@ -657,13 +657,23 @@ div.querySelector(".deleteFixtureBtn")?.addEventListener("click", async () => {
       `;
       for (let player in all) {
         const p = all[player];
-        const res = currentResults[fixture.id];
-        let pts = res ? calculatePoints(p, res) : "-";
+if (!p || typeof p.home !== "number" || typeof p.away !== "number") continue; // skip players with no prediction
 
-        let predictionDisplay = "🔒";
-        if ((res && typeof res.home === "number" && typeof res.away === "number") || player === currentUser) {
-          predictionDisplay = `${p.home}:${p.away}`;
-        }
+const res = currentResults[fixture.id];
+const resultEntered = res && typeof res.home === "number" && typeof res.away === "number";
+
+let pts = resultEntered ? calculatePoints(p, res) : "-";
+
+let predictionDisplay = "🔒";
+let predictionClass = "text-gray-400 italic";
+let tooltip = 'title="Hidden until result is submitted"';
+
+if (player === currentUser || resultEntered) {
+  predictionDisplay = `${p.home}:${p.away}`;
+  predictionClass = "";
+  tooltip = "";
+}
+
 
         let predictionClass = (!res && player !== currentUser)
           ? 'text-gray-400 italic'
