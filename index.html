@@ -656,7 +656,7 @@ div.querySelector(".deleteFixtureBtn")?.addEventListener("click", async () => {
             <tbody>
       `;
       for (let player in all) {
-        const p = all[player];
+const p = all[player];
 if (!p || typeof p.home !== "number" || typeof p.away !== "number") continue; // skip players with no prediction
 
 const res = currentResults[fixture.id];
