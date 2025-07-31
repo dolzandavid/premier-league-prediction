@@ -639,7 +639,8 @@ div.querySelector(".deleteFixtureBtn")?.addEventListener("click", async () => {
     // Show predictions from others ONLY if this user submitted one
     const predDiv = div.querySelector(".playersPredictions");
     const all = currentPredictions[fixture.id] || {};
-    const showOthers = hasPrediction;
+   const showOthers = Object.keys(all).length > 0;
+
 
     if (showOthers && Object.keys(all).length > 0) {
       let html = `
@@ -660,9 +661,17 @@ div.querySelector(".deleteFixtureBtn")?.addEventListener("click", async () => {
         let pts = res ? calculatePoints(p, res) : "-";
 
         let predictionDisplay = "🔒";
-        if (res || player === currentUser) {
+        if ((res && typeof res.home === "number" && typeof res.away === "number") || player === currentUser) {
           predictionDisplay = `${p.home}:${p.away}`;
         }
+
+        let predictionClass = (!res && player !== currentUser)
+          ? 'text-gray-400 italic'
+          : '';
+
+        let tooltip = (!res && player !== currentUser)
+          ? 'title="Hidden until result is submitted"'
+          : '';
 
         let ptsBgClass = "bg-gray-400";
         if (typeof pts === "number") {
@@ -675,9 +684,7 @@ div.querySelector(".deleteFixtureBtn")?.addEventListener("click", async () => {
           <tr class="hover:bg-gray-50">
             <td class="border-t px-2 py-1">${player.charAt(0).toUpperCase() + player.slice(1)}</td>
             <td class="border-t px-2 py-1">
-              <span ${!res && player !== currentUser ? 'class="text-gray-400 italic" title="Hidden until result is submitted"' : ''}>
-                ${predictionDisplay}
-              </span>
+              <span class="${predictionClass}" ${tooltip}>${predictionDisplay}</span>
             </td>
             <td class="border-t px-2 py-1">
               <span class="px-2 py-1 rounded-full text-white text-xs ${ptsBgClass}">${pts}</span>
