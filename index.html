@@ -668,6 +668,7 @@ let predictionDisplay = "🔒";
 let predictionClass = "text-gray-400 italic";
 let tooltip = 'title="Hidden until result is submitted"';
 
+console.log("Fixture:", fixture.id, "| Player:", player, "| res =", res);
 if (player === currentUser || resultEntered) {
   predictionDisplay = `${p.home}:${p.away}`;
   predictionClass = "";
