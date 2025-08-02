@@ -456,6 +456,10 @@ function renderGameweek() {
 const deadline = rawDeadline instanceof Date ? rawDeadline : new Date(rawDeadline);
 const afterDeadline = deadline && new Date() > deadline;
 
+console.log("📅 Deadline:", deadline);
+console.log("🕒 Now:", new Date());
+console.log("⏳ After deadline?", afterDeadline);
+
   for (const fixture of currentFixtures) {
     const result = currentResults[fixture.id];
     const pred = currentPredictions[fixture.id]?.[currentUser];
