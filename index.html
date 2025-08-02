@@ -459,7 +459,7 @@ const afterDeadline = deadline && new Date() > deadline;
   for (const fixture of currentFixtures) {
     const result = currentResults[fixture.id];
     const pred = currentPredictions[fixture.id]?.[currentUser];
-    const isLocked = !!result;
+    const isLocked = !!result || afterDeadline;
     const hasPrediction = !!pred;
 
     const div = document.createElement("div");
