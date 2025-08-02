@@ -665,7 +665,6 @@ div.querySelector(".deleteFixtureBtn")?.addEventListener("click", async () => {
         let pts = res ? calculatePoints(p, res) : "-";
 
         let predictionDisplay = "🔒";
-let predictionDisplay = "🔒";
 if (res || player === currentUser || afterDeadline) {
   predictionDisplay = `${p.home}:${p.away}`;
 }
