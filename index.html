@@ -665,13 +665,13 @@ div.querySelector(".deleteFixtureBtn")?.addEventListener("click", async () => {
           predictionDisplay = `${p.home}:${p.away}`;
         }
 
-        let predictionClass = (!res && player !== currentUser)
-          ? 'text-gray-400 italic'
-          : '';
+let predictionClass = (!res && player !== currentUser && !afterDeadline)
+  ? 'text-gray-400 italic'
+  : '';
 
-        let tooltip = (!res && player !== currentUser)
-          ? 'title="Hidden until result is submitted"'
-          : '';
+let tooltip = (!res && player !== currentUser && !afterDeadline)
+  ? 'title="Hidden until result is submitted or deadline passed"'
+  : '';
 
         let ptsBgClass = "bg-gray-400";
         if (typeof pts === "number") {
