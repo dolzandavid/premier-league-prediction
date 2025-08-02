@@ -446,9 +446,6 @@ function subscribeToGameweek(gameweek) {
     }
   });
   unsubscribeFns.push(unsubDeadline);
-
-  // ✅ Always render once with cache (in case snapshots don’t fire immediately)
-renderGameweek();
 }
 
 function renderGameweek() {
