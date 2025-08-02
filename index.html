@@ -452,6 +452,9 @@ function renderGameweek() {
   const fixturesContainer = document.getElementById("fixturesContainer");
   fixturesContainer.innerHTML = "";
 
+ const deadline = deadlinesByWeek[currentGameweek];
+  const afterDeadline = deadline && new Date() > deadline;
+
   for (const fixture of currentFixtures) {
     const result = currentResults[fixture.id];
     const pred = currentPredictions[fixture.id]?.[currentUser];
