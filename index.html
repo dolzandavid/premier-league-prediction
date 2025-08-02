@@ -947,6 +947,11 @@ function renderLeaderboardsFromLocalCache() {
 
 }
 
+// 🔁 Clear sessionStorage unless it's a full reload (Ctrl+Shift+R)
+if (performance?.navigation?.type !== 1) {
+  sessionStorage.clear();
+}
+
 window.addEventListener("DOMContentLoaded", async () => {
   const savedUser = localStorage.getItem("loggedInUser");
   const savedGameweek = localStorage.getItem("selectedGameweek");
