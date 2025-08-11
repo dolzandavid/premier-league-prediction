@@ -309,9 +309,11 @@ loginBtn.onclick = async () => {
     await determineClosestGameweek();
     subscribeToGameweek(currentGameweek);
 
-
-    populateGameweekDropdownFromCache(); // Populate dropdown from whatever cache exists so far
-
+if (Object.keys(gameweekCache).length > 0) {
+  populateGameweekDropdownFromCache();
+} else {
+  await populateGameweekDropdown(); // 🔹 queries Firestore and fills dropdown
+}
     document.getElementById("loadingOverlay").classList.add("hidden");
 
     // 🔹 Start background leaderboard loading (all gameweeks)
