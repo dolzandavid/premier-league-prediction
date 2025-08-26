@@ -856,6 +856,7 @@ async function computeSeasonStatsUpToCurrentGW() {
 
   // 2) Player predicted points per team
   const playerTeamPred = {}; // user -> team -> predicted points
+  const predictionsScoredByPlayer = {}; // only predictions where a result exists
 
   // Iterate all weeks <= current
   const sortedWeeks = Object.keys(gameweekCache)
@@ -920,6 +921,20 @@ async function computeSeasonStatsUpToCurrentGW() {
         playerTeamPred[user] = playerTeamPred[user] || {};
         playerTeamPred[user][home] = (playerTeamPred[user][home] || 0) + pointsForOutcome(predictedOutcome, "home");
         playerTeamPred[user][away] = (playerTeamPred[user][away] || 0) + pointsForOutcome(predictedOutcome, "away");
+  
+        // ---- (B) Save only SCORABLE predictions with the actual result ----
+  if (res && typeof res.home === "number" && typeof res.away === "number") {
+    (predictionsScoredByPlayer[user] ||= []).push({
+      gw: w,
+      fixtureId: fid,
+      home,
+      away,
+      predHome: p.home,
+      predAway: p.away,
+      resHome: res.home,
+      resAway: res.away
+    });
+  }
       }
     }
   }
@@ -1109,72 +1124,67 @@ function htmlTeamsList(teams, suffix = "") {
 }
 
 async function openPredictionStatsModal() {
-  const stats = await getSeasonStats(); // uses your existing cache helper
+  const stats = await getSeasonStats();
   const gw = stats.currentGameweek ?? currentGameweek;
-  const teamRealPoints = Object.fromEntries(
-    Object.entries(stats.teams || {}).map(([team, t]) => [team, t.points ?? 0])
-  );
-  const perPlayer = stats.playerPredictedTeamPoints || {};
 
+  const likedHatedTotals = stats.playerPredictedTeamPoints || {};
+  const scored = (stats.predictions && stats.predictions.scoredByPlayer) || {};
+  
   let html = "";
 
-  for (const [player, tmap] of Object.entries(perPlayer)) {
-    // Build per-team predicted points (ensure only teams known in stats are considered)
-    const predicted = {};
-    for (const [team, pts] of Object.entries(tmap || {})) {
-      if (teamRealPoints.hasOwnProperty(team)) predicted[team] = pts ?? 0;
+  for (const player of Object.keys({ ...likedHatedTotals, ...scored })) {
+    // --- Most liked / hated from playerPredictedTeamPoints (all predictions) ---
+    const predTotals = likedHatedTotals[player] || {}; // { team: predictedPtsTotal }
+
+    // helpers
+    const entries = Object.entries(predTotals);
+    const maxPred = entries.length ? Math.max(...entries.map(([,v]) => v)) : 0;
+    const minPred = entries.length ? Math.min(...entries.map(([,v]) => v)) : 0;
+    const mostLikedTeams = entries.filter(([,v]) => v === maxPred).map(([t]) => t);
+    const mostHatedTeams = entries.filter(([,v]) => v === minPred).map(([t]) => t);
+
+    // --- Over/Under/Best from scoredByPlayer (only fixtures with results) ---
+    const scoredList = scored[player] || []; // array of {home,away,predHome,predAway,resHome,resAway}
+
+    // Build per-team predicted-vs-real points only across scored fixtures for THIS player
+    const perTeamPred = {};
+    const perTeamReal = {};
+
+    for (const item of scoredList) {
+      const { home, away, predHome, predAway, resHome, resAway } = item;
+      const predOut = matchOutcomeFromScore(predHome, predAway);
+      const realOut = matchOutcomeFromScore(resHome, resAway);
+
+      perTeamPred[home] = (perTeamPred[home] || 0) + pointsForOutcome(predOut, "home");
+      perTeamPred[away] = (perTeamPred[away] || 0) + pointsForOutcome(predOut, "away");
+
+      perTeamReal[home] = (perTeamReal[home] || 0) + pointsForOutcome(realOut, "home");
+      perTeamReal[away] = (perTeamReal[away] || 0) + pointsForOutcome(realOut, "away");
     }
 
-    // If a team exists in real table but not predicted, you can choose to treat as 0:
-    for (const team of Object.keys(teamRealPoints)) {
-      if (!predicted.hasOwnProperty(team)) predicted[team] = 0;
+    // deltas
+    const teamsSeen = new Set([...Object.keys(perTeamPred), ...Object.keys(perTeamReal)]);
+    let mostOverVal = -Infinity, mostUnderVal = -Infinity, bestAbs = Infinity;
+    let mostOverTeams = [], mostUnderTeams = [], bestTeams = [];
+
+    for (const team of teamsSeen) {
+      const p = perTeamPred[team] || 0;
+      const r = perTeamReal[team] || 0;
+      const delta = p - r;           // overrated if large positive
+      const under = r - p;           // underrated if large positive
+      const absd  = Math.abs(r - p); // best predicted if small
+
+      if (delta > mostOverVal) { mostOverVal = delta; mostOverTeams = [team]; }
+      else if (delta === mostOverVal) mostOverTeams.push(team);
+
+      if (under > mostUnderVal) { mostUnderVal = under; mostUnderTeams = [team]; }
+      else if (under === mostUnderVal) mostUnderTeams.push(team);
+
+      if (absd < bestAbs) { bestAbs = absd; bestTeams = [team]; }
+      else if (absd === bestAbs) bestTeams.push(team);
     }
 
-    // Over/under maps
-    const delta = {};     // predicted - real
-    const absDiff = {};   // |real - predicted|
-    for (const team of Object.keys(teamRealPoints)) {
-      const p = predicted[team] ?? 0;
-      const r = teamRealPoints[team] ?? 0;
-      delta[team]   = p - r;
-      absDiff[team] = Math.abs(r - p);
-    }
-
-    // 1) Most liked: max predicted points
-    const mostLiked = pickTeamsByValue(predicted, v => v);
-
-    // 2) Most hated: min predicted points
-    // reuse with invert selector by subtracting
-    const mostHated = (() => {
-      const entries = Object.entries(predicted);
-      if (entries.length === 0) return { value: null, teams: [] };
-      let bestVal = null, teams = [];
-      for (const [team, v] of entries) {
-        const inv = -v;
-        if (bestVal === null || inv > bestVal) { bestVal = inv; teams = [team]; }
-        else if (inv === bestVal) teams.push(team);
-      }
-      return { value: -bestVal, teams };
-    })();
-
-    // 3) Most overrated: max (predicted - real)
-    const mostOver = pickTeamsByValue(delta, v => v);
-
-    // 4) Most underrated: max (real - predicted) == max (-delta)
-    const mostUnder = (() => {
-      const entries = Object.entries(delta);
-      if (entries.length === 0) return { value: null, teams: [] };
-      let bestVal = null, teams = [];
-      for (const [team, v] of entries) {
-        const inv = -v;
-        if (bestVal === null || inv > bestVal) { bestVal = inv; teams = [team]; }
-        else if (inv === bestVal) teams.push(team);
-      }
-      return { value: bestVal, teams }; // value is (real - predicted)
-    })();
-
-    // 5) Best predicted: min |real - predicted|
-    const bestPred = pickTeamsByMinAbsDiff(absDiff);
+    const listTeams = arr => arr.length ? arr.map(t => `<span class="font-medium">${t}</span>`).join(", ") : "–";
 
     html += `
       <div class="mb-4 border-b pb-3">
@@ -1182,28 +1192,23 @@ async function openPredictionStatsModal() {
         <div class="text-sm">
           <div class="mb-1">
             <span class="font-medium">Most liked team:</span>
-                ${htmlTeamsList(mostLiked.teams)}
-        <span class="text-gray-600">(${mostLiked.value ?? 0} pts)</span>
+            ${listTeams(mostLikedTeams)} <span class="text-gray-600">(${maxPred} pts)</span>
           </div>
           <div class="mb-1">
             <span class="font-medium">Most hated team:</span>
-               ${htmlTeamsList(mostHated.teams)}
-        <span class="text-gray-600">(${mostHated.value ?? 0} pts)</span>
+            ${listTeams(mostHatedTeams)} <span class="text-gray-600">(${minPred} pts)</span>
           </div>
           <div class="mb-1">
             <span class="font-medium">Most overrated team:</span>
-           ${htmlTeamsList(mostOver.teams)}
-        <span class="text-gray-600">(+${mostOver.value ?? 0})</span>
+            ${listTeams(mostOverTeams)} <span class="text-gray-600">(+${Number.isFinite(mostOverVal) ? mostOverVal : 0})</span>
           </div>
           <div class="mb-1">
             <span class="font-medium">Most underrated team:</span>
-             ${htmlTeamsList(mostUnder.teams)}
-        <span class="text-gray-600">(-${mostUnder.value ?? 0})</span>
+            ${listTeams(mostUnderTeams)} <span class="text-gray-600">(-${Number.isFinite(mostUnderVal) ? mostUnderVal : 0})</span>
           </div>
           <div class="mb-1">
             <span class="font-medium">Best predicted team:</span>
-            ${htmlTeamsList(bestPred.teams)}
-        <span class="text-gray-600">(±${bestPred.value ?? 0})</span>
+            ${listTeams(bestTeams)} <span class="text-gray-600">(±${Number.isFinite(bestAbs) ? bestAbs : 0})</span>
           </div>
         </div>
       </div>
