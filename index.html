@@ -826,127 +826,143 @@ function fixtureTimeFromId(fixtureId) {
   return Number.isFinite(n) ? n : 0;
 }
 
+// ——— Compute all stats up to currentGameweek ———
 async function computeSeasonStatsUpToCurrentGW() {
-  // Adjust how you determine the current GW if you have a better source:
-  const gwMax = typeof currentGameweek === "number" ? currentGameweek : 1;
+  // Ensure we have cache up to currentGameweek (minimal fetch if missing)
+  const haveWeeks = Object.keys(gameweekCache).length > 0;
+  if (!haveWeeks) {
+    const fixtureDocs = await getDocs(collection(db, "fixtures"));
+    const allFixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
+    const weeks = [...new Set(allFixtures.map(f => f.gameweek))]
+      .filter(Boolean).map(String);
 
-  const toNum = v => Number(v ?? 0);
-  const outcomeFrom = (h, a) => (h > a ? "home" : h < a ? "away" : "draw");
-  const ptsFor = (outcome, side) => outcome === "draw" ? 1 : (outcome === side ? 3 : 0);
-
-  const fixturesByGW = {};
-  const resultsByGW  = {};
-  const predsByGW    = {};
-
-  // Firestore reads
-  for (let gw = 1; gw <= gwMax; gw++) {
-    const [fxDoc, rsDoc, prDoc] = await Promise.all([
-      getDoc(doc(db, "fixtures", String(gw))),
-      getDoc(doc(db, "results",  String(gw))),
-      getDoc(doc(db, "predictions", String(gw))),
-    ]);
-
-    // Fixtures: accept array or map
-    let fixtures = [];
-    if (fxDoc.exists()) {
-      const d = fxDoc.data();
-      if (Array.isArray(d.fixtures)) fixtures = d.fixtures;
-      else if (d && typeof d === "object") {
-        const maybe = d.fixtures || d;
-        fixtures = Array.isArray(maybe) ? maybe : Object.values(maybe || {});
-      }
+    for (const w of weeks) {
+      if (+w > +currentGameweek) continue;
+      const [predSnap, resSnap] = await Promise.all([
+        getDoc(doc(db, "predictions", w)),
+        getDoc(doc(db, "results", w))
+      ]);
+      const fixtures = allFixtures.filter(f => String(f.gameweek) === w);
+      gameweekCache[w] = gameweekCache[w] || {};
+      gameweekCache[w].fixtures = fixtures;
+      gameweekCache[w].predictions = predSnap.exists() ? predSnap.data() : {};
+      gameweekCache[w].results = resSnap.exists() ? resSnap.data() : {};
     }
-    fixturesByGW[gw] = fixtures
-      .filter(f => f && (f.home || f.homeTeam) && (f.away || f.awayTeam))
-      .map(f => ({
-        id: f.id ?? `${gw}_${(f.home||f.homeTeam)}_${(f.away||f.awayTeam)}`,
-        home: f.home || f.homeTeam,
-        away: f.away || f.awayTeam,
-      }));
-
-    resultsByGW[gw] = rsDoc.exists() ? (rsDoc.data() || {}) : {};
-    predsByGW[gw]   = prDoc.exists() ? (prDoc.data() || {}) : {};
   }
 
-  // ----------------------------------------------------------
-  // Build playerPredictedTeamPoints (ALL predictions, even without results)
-  // and predictions.scoredByPlayer (ONLY fixtures WITH results)
-  // ----------------------------------------------------------
-  const playerPredictedTeamPoints = {}; // player -> { team -> totalPredPts }
-  const scoredByPlayer = {};            // player -> [{home,away,predHome,predAway,resHome,resAway}]
+  // 1) League table + form (up to currentGW)
+  const teamTable = {}; // team -> accumulator
+  const teamMatchesChrono = {}; // team -> array of 'W/D/L' ordered by time
 
-  for (let gw = 1; gw <= gwMax; gw++) {
-    const fixtures = fixturesByGW[gw];
-    const resDoc  = resultsByGW[gw];   // { [fixtureId]: {home,away} } OR flat {homeTeam_awayTeam: {...}}
-    const predDoc = predsByGW[gw];     // { player: { [fixtureId]: {home,away} } }
+  // 2) Player predicted points per team
+  const playerTeamPred = {}; // user -> team -> predicted points
 
-    // Normalize results into a lookup by fixtureId
-    const resultById = {};
-    // If results doc is keyed by fixtureId, use that; else try to match by (home,away)
-    for (const fx of fixtures) {
-      const fid = fx.id;
-      // common shapes
-      const r1 = resDoc[fid];
-      const r2 = resDoc?.results?.[fid];
-      // fallback: some stores use team key
-      const key3 = `${fx.home}__${fx.away}`;
-      const r3 = resDoc[key3];
+  // Iterate all weeks <= current
+  const sortedWeeks = Object.keys(gameweekCache)
+    .map(String)
+    .filter(w => +w <= +currentGameweek)
+    .sort((a,b)=>+a - +b);
 
-      const r = r1 || r2 || r3;
-      if (r && (r.home != null) && (r.away != null)) {
-        resultById[fid] = { resHome: toNum(r.home), resAway: toNum(r.away) };
+  for (const w of sortedWeeks) {
+    const { fixtures = [], results = {}, predictions = {} } = gameweekCache[w] || {};
+
+    // Sort fixtures by their time (from id) for form chronology
+    const fixturesSorted = [...fixtures].sort((a,b) =>
+      fixtureTimeFromId(a.id) - fixtureTimeFromId(b.id)
+    );
+
+    for (const f of fixturesSorted) {
+      const fid = f.id;
+      const res = results[fid];
+      if (res && typeof res.home === "number" && typeof res.away === "number") {
+        const home = normalizeNameLeague(f.home);
+        const away = normalizeNameLeague(f.away);
+
+        teamTable[home] = teamTable[home] || teamStatsAccumulator();
+        teamTable[away] = teamTable[away] || teamStatsAccumulator();
+        teamMatchesChrono[home] = teamMatchesChrono[home] || [];
+        teamMatchesChrono[away] = teamMatchesChrono[away] || [];
+
+        // Update league aggregates
+        const out = matchOutcomeFromScore(res.home, res.away);
+        const homePts = pointsForOutcome(out, "home");
+        const awayPts = pointsForOutcome(out, "away");
+
+        const th = teamTable[home];
+        const ta = teamTable[away];
+
+        th.played++; ta.played++;
+        th.gf += res.home; th.ga += res.away;
+        ta.gf += res.away; ta.ga += res.home;
+        th.gd = th.gf - th.ga;
+        ta.gd = ta.gf - ta.ga;
+
+        if (out === "H") { th.wins++; ta.losses++; }
+        else if (out === "A") { ta.wins++; th.losses++; }
+        else { th.draws++; ta.draws++; }
+
+        th.points += homePts;
+        ta.points += awayPts;
+
+        // Form arrays (W/D/L)
+        teamMatchesChrono[home].push(out === "H" ? "W" : (out === "A" ? "L" : "D"));
+        teamMatchesChrono[away].push(out === "A" ? "W" : (out === "H" ? "L" : "D"));
+      }
+
+      // Predicted points per team (for each player)
+      const predsForFixture = predictions[fid] || {};
+      for (const [user, p] of Object.entries(predsForFixture)) {
+        if (!p || typeof p.home !== "number" || typeof p.away !== "number") continue;
+        const predictedOutcome = matchOutcomeFromScore(p.home, p.away);
+        const home = normalizeNameLeague(f.home);
+        const away = normalizeNameLeague(f.away);
+
+        playerTeamPred[user] = playerTeamPred[user] || {};
+        playerTeamPred[user][home] = (playerTeamPred[user][home] || 0) + pointsForOutcome(predictedOutcome, "home");
+        playerTeamPred[user][away] = (playerTeamPred[user][away] || 0) + pointsForOutcome(predictedOutcome, "away");
       }
     }
+  }
 
-    // For each player
-    for (const player of Object.keys(predDoc || {})) {
-      const pMap = predDoc[player] || {};
-      playerPredictedTeamPoints[player] ||= {};
-      scoredByPlayer[player] ||= [];
+  // Build league table array with positions
+  const teams = Object.keys(teamTable);
+  const tableArr = teams.map(team => ({
+    team,
+    ...teamTable[team], // played,wins,draws,losses,gf,ga,gd,points
+  })).sort((a, b) => {
+    if (b.points !== a.points) return b.points - a.points;
+    if (b.gd !== a.gd) return b.gd - a.gd;
+    if (b.gf !== a.gf) return b.gf - a.gf;
+    return a.team.localeCompare(b.team);
+  });
 
-      for (const fx of fixtures) {
-        const fid = fx.id;
+  const positionByTeam = {};
+  tableArr.forEach((row, idx) => positionByTeam[row.team] = idx + 1);
 
-        // predicted score (various possible shapes)
-        const p1 = pMap[fid];
-        const p2 = pMap?.predictions?.[fid];
-        const p3 = pMap?.[`${fx.home}__${fx.away}`];
-        const pred = p1 || p2 || p3;
-
-        if (!pred) continue;
-
-        const ph = toNum(pred.home ?? pred.predHome ?? pred.h);
-        const pa = toNum(pred.away ?? pred.predAway ?? pred.a);
-
-        // Add to "liked/hated" (predicted points for each team) — regardless of results
-        const predOutcome = outcomeFrom(ph, pa);
-        playerPredictedTeamPoints[player][fx.home] =
-          (playerPredictedTeamPoints[player][fx.home] || 0) + ptsFor(predOutcome, "home");
-        playerPredictedTeamPoints[player][fx.away] =
-          (playerPredictedTeamPoints[player][fx.away] || 0) + ptsFor(predOutcome, "away");
-
-        // If result exists, add to scoredByPlayer
-        const r = resultById[fid];
-        if (r) {
-          scoredByPlayer[player].push({
-            home: fx.home,
-            away: fx.away,
-            predHome: ph,
-            predAway: pa,
-            resHome: r.resHome,
-            resAway: r.resAway,
-          });
-        }
-      }
-    }
+  // Attach last-6 form to each team (most recent last)
+  const teamsDoc = {};
+  for (const team of teams) {
+    const forms = teamMatchesChrono[team] || [];
+    const last6 = forms.slice(-6);
+    const t = teamTable[team];
+    teamsDoc[team] = {
+      form: last6,
+      position: positionByTeam[team] || null,
+      played: t.played,
+      wins: t.wins,
+      draws: t.draws,
+      losses: t.losses,
+      gf: t.gf,
+      ga: t.ga,
+      gd: t.gd,
+      points: t.points
+    };
   }
 
   return {
-    currentGameweek: gwMax,
-    playerPredictedTeamPoints,
-    predictions: {
-      scoredByPlayer
-    }
+    currentGameweek: String(currentGameweek),
+    teams: teamsDoc,
+    playerPredictedTeamPoints: playerTeamPred
   };
 }
 
@@ -1093,67 +1109,72 @@ function htmlTeamsList(teams, suffix = "") {
 }
 
 async function openPredictionStatsModal() {
-  const stats = await getSeasonStats();
+  const stats = await getSeasonStats(); // uses your existing cache helper
   const gw = stats.currentGameweek ?? currentGameweek;
+  const teamRealPoints = Object.fromEntries(
+    Object.entries(stats.teams || {}).map(([team, t]) => [team, t.points ?? 0])
+  );
+  const perPlayer = stats.playerPredictedTeamPoints || {};
 
-  const likedHatedTotals = stats.playerPredictedTeamPoints || {};
-  const scored = (stats.predictions && stats.predictions.scoredByPlayer) || {};
-  
   let html = "";
 
-  for (const player of Object.keys({ ...likedHatedTotals, ...scored })) {
-    // --- Most liked / hated from playerPredictedTeamPoints (all predictions) ---
-    const predTotals = likedHatedTotals[player] || {}; // { team: predictedPtsTotal }
-
-    // helpers
-    const entries = Object.entries(predTotals);
-    const maxPred = entries.length ? Math.max(...entries.map(([,v]) => v)) : 0;
-    const minPred = entries.length ? Math.min(...entries.map(([,v]) => v)) : 0;
-    const mostLikedTeams = entries.filter(([,v]) => v === maxPred).map(([t]) => t);
-    const mostHatedTeams = entries.filter(([,v]) => v === minPred).map(([t]) => t);
-
-    // --- Over/Under/Best from scoredByPlayer (only fixtures with results) ---
-    const scoredList = scored[player] || []; // array of {home,away,predHome,predAway,resHome,resAway}
-
-    // Build per-team predicted-vs-real points only across scored fixtures for THIS player
-    const perTeamPred = {};
-    const perTeamReal = {};
-
-    for (const item of scoredList) {
-      const { home, away, predHome, predAway, resHome, resAway } = item;
-      const predOut = matchOutcomeFromScore(predHome, predAway);
-      const realOut = matchOutcomeFromScore(resHome, resAway);
-
-      perTeamPred[home] = (perTeamPred[home] || 0) + pointsForOutcome(predOut, "home");
-      perTeamPred[away] = (perTeamPred[away] || 0) + pointsForOutcome(predOut, "away");
-
-      perTeamReal[home] = (perTeamReal[home] || 0) + pointsForOutcome(realOut, "home");
-      perTeamReal[away] = (perTeamReal[away] || 0) + pointsForOutcome(realOut, "away");
+  for (const [player, tmap] of Object.entries(perPlayer)) {
+    // Build per-team predicted points (ensure only teams known in stats are considered)
+    const predicted = {};
+    for (const [team, pts] of Object.entries(tmap || {})) {
+      if (teamRealPoints.hasOwnProperty(team)) predicted[team] = pts ?? 0;
     }
 
-    // deltas
-    const teamsSeen = new Set([...Object.keys(perTeamPred), ...Object.keys(perTeamReal)]);
-    let mostOverVal = -Infinity, mostUnderVal = -Infinity, bestAbs = Infinity;
-    let mostOverTeams = [], mostUnderTeams = [], bestTeams = [];
-
-    for (const team of teamsSeen) {
-      const p = perTeamPred[team] || 0;
-      const r = perTeamReal[team] || 0;
-      const delta = p - r;           // overrated if large positive
-      const under = r - p;           // underrated if large positive
-      const absd  = Math.abs(r - p); // best predicted if small
-
-      if (delta > mostOverVal) { mostOverVal = delta; mostOverTeams = [team]; }
-      else if (delta === mostOverVal) mostOverTeams.push(team);
-
-      if (under > mostUnderVal) { mostUnderVal = under; mostUnderTeams = [team]; }
-      else if (under === mostUnderVal) mostUnderTeams.push(team);
-
-      if (absd < bestAbs) { bestAbs = absd; bestTeams = [team]; }
-      else if (absd === bestAbs) bestTeams.push(team);
+    // If a team exists in real table but not predicted, you can choose to treat as 0:
+    for (const team of Object.keys(teamRealPoints)) {
+      if (!predicted.hasOwnProperty(team)) predicted[team] = 0;
     }
 
-    const listTeams = arr => arr.length ? arr.map(t => `<span class="font-medium">${t}</span>`).join(", ") : "–";
+    // Over/under maps
+    const delta = {};     // predicted - real
+    const absDiff = {};   // |real - predicted|
+    for (const team of Object.keys(teamRealPoints)) {
+      const p = predicted[team] ?? 0;
+      const r = teamRealPoints[team] ?? 0;
+      delta[team]   = p - r;
+      absDiff[team] = Math.abs(r - p);
+    }
+
+    // 1) Most liked: max predicted points
+    const mostLiked = pickTeamsByValue(predicted, v => v);
+
+    // 2) Most hated: min predicted points
+    // reuse with invert selector by subtracting
+    const mostHated = (() => {
+      const entries = Object.entries(predicted);
+      if (entries.length === 0) return { value: null, teams: [] };
+      let bestVal = null, teams = [];
+      for (const [team, v] of entries) {
+        const inv = -v;
+        if (bestVal === null || inv > bestVal) { bestVal = inv; teams = [team]; }
+        else if (inv === bestVal) teams.push(team);
+      }
+      return { value: -bestVal, teams };
+    })();
+
+    // 3) Most overrated: max (predicted - real)
+    const mostOver = pickTeamsByValue(delta, v => v);
+
+    // 4) Most underrated: max (real - predicted) == max (-delta)
+    const mostUnder = (() => {
+      const entries = Object.entries(delta);
+      if (entries.length === 0) return { value: null, teams: [] };
+      let bestVal = null, teams = [];
+      for (const [team, v] of entries) {
+        const inv = -v;
+        if (bestVal === null || inv > bestVal) { bestVal = inv; teams = [team]; }
+        else if (inv === bestVal) teams.push(team);
+      }
+      return { value: bestVal, teams }; // value is (real - predicted)
+    })();
+
+    // 5) Best predicted: min |real - predicted|
+    const bestPred = pickTeamsByMinAbsDiff(absDiff);
 
     html += `
       <div class="mb-4 border-b pb-3">
@@ -1161,23 +1182,28 @@ async function openPredictionStatsModal() {
         <div class="text-sm">
           <div class="mb-1">
             <span class="font-medium">Most liked team:</span>
-            ${listTeams(mostLikedTeams)} <span class="text-gray-600">(${maxPred} pts)</span>
+                ${htmlTeamsList(mostLiked.teams)}
+        <span class="text-gray-600">(${mostLiked.value ?? 0} pts)</span>
           </div>
           <div class="mb-1">
             <span class="font-medium">Most hated team:</span>
-            ${listTeams(mostHatedTeams)} <span class="text-gray-600">(${minPred} pts)</span>
+               ${htmlTeamsList(mostHated.teams)}
+        <span class="text-gray-600">(${mostHated.value ?? 0} pts)</span>
           </div>
           <div class="mb-1">
             <span class="font-medium">Most overrated team:</span>
-            ${listTeams(mostOverTeams)} <span class="text-gray-600">(+${Number.isFinite(mostOverVal) ? mostOverVal : 0})</span>
+           ${htmlTeamsList(mostOver.teams)}
+        <span class="text-gray-600">(+${mostOver.value ?? 0})</span>
           </div>
           <div class="mb-1">
             <span class="font-medium">Most underrated team:</span>
-            ${listTeams(mostUnderTeams)} <span class="text-gray-600">(-${Number.isFinite(mostUnderVal) ? mostUnderVal : 0})</span>
+             ${htmlTeamsList(mostUnder.teams)}
+        <span class="text-gray-600">(-${mostUnder.value ?? 0})</span>
           </div>
           <div class="mb-1">
             <span class="font-medium">Best predicted team:</span>
-            ${listTeams(bestTeams)} <span class="text-gray-600">(±${Number.isFinite(bestAbs) ? bestAbs : 0})</span>
+            ${htmlTeamsList(bestPred.teams)}
+        <span class="text-gray-600">(±${bestPred.value ?? 0})</span>
           </div>
         </div>
       </div>
