@@ -1118,7 +1118,16 @@ document.addEventListener("click", async (e) => {
 
       html += `Form Guide:\n- ${home}: ${renderForm(tHome?.form)}\n- ${away}: ${renderForm(tAway?.form)}\n\n`;
 
-      html += `League Position:\n- ${home}: ${tHome?.position ?? "-"} (${tHome?.points ?? 0} pts)\n- ${away}: ${tAway?.position ?? "-"} (${tAway?.points ?? 0} pts)\n\n`;
+const gwNumber = statsDoc?.currentGameweek ?? currentGameweek;
+
+function renderPosition(pos) {
+  if (!pos) return "-";
+  return `<span class="text-red-600 font-bold">${pos}.</span>`;
+}
+
+html += `League Position (up to and including Gameweek ${gwNumber}):\n` +
+        `- ${home}: ${renderPosition(tHome?.position)} (${tHome?.points ?? 0} pts)\n` +
+        `- ${away}: ${renderPosition(tAway?.position)} (${tAway?.points ?? 0} pts)\n\n`;      
     }
 
    
