@@ -8,6 +8,22 @@
   <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+ <style>
+  /* Force styles just for the Predictions stats button */
+  #btnPredStats {
+    background-color: #4f46e5 !important; /* indigo-600 */
+    color: #ffffff !important;
+    padding: 0.25rem 0.75rem !important;  /* py-1 px-3 */
+    border-radius: 0.25rem !important;    /* rounded */
+    display: inline-block !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    filter: none !important;
+  }
+  #btnPredStats:hover {
+    background-color: #4338ca !important; /* indigo-700 */
+  }
+</style>
   <style>
     input[type="number"]::-webkit-inner-spin-button,
     input[type="number"]::-webkit-outer-spin-button {
@@ -76,7 +92,7 @@
 <div id="statsButtons" class="mb-4 flex gap-2" style="display:none;">
   <button id="btnLeagueTable" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-sm">League Table</button>
   <button id="btnFormGuide"  class="bg-indigo-700 hover:bg-indigo-800 text-white px-3 py-1 rounded text-sm">Form Guide</button>
-  <button id="btnPredStats" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1 rounded text-sm">Predictions stats</button>
+  <button id="btnPredStats" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-sm">Predictions stats</button>
 </div>
 
 <!-- Stats Modal -->
