@@ -76,7 +76,7 @@
 <div id="statsButtons" class="mb-4 flex gap-2" style="display:none;">
   <button id="btnLeagueTable" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-sm">League Table</button>
   <button id="btnFormGuide"  class="bg-gray-700 hover:bg-gray-800 text-white px-3 py-1 rounded text-sm">Form Guide</button>
-  <button id="btnPredStats" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1 rounded text-sm">
+  <button id="btnPredStats" class="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded text-sm">
   Predictions stats
 </button>
 </div>
@@ -1087,7 +1087,7 @@ function pickTeamsByMinAbsDiff(diffMap) {
 
 function htmlTeamsList(teams, suffix = "") {
   if (!teams || teams.length === 0) return "–";
-  return teams.map(t => `<span class="font-medium">${t}</span>${suffix}`).join(", ");
+ return teams.map(t => `<span class="font-medium">${t}</span>`).join(", ");
 }
 
 async function openPredictionStatsModal() {
@@ -1164,23 +1164,28 @@ async function openPredictionStatsModal() {
         <div class="text-sm">
           <div class="mb-1">
             <span class="font-medium">Most liked team:</span>
-            ${htmlTeamsList(mostLiked.teams, ` <span class="text-gray-600">(${mostLiked.value ?? 0} pts)</span>`)}
+                ${htmlTeamsList(mostLiked.teams)}
+        <span class="text-gray-600">(${mostLiked.value ?? 0} pts)</span>
           </div>
           <div class="mb-1">
             <span class="font-medium">Most hated team:</span>
-            ${htmlTeamsList(mostHated.teams, ` <span class="text-gray-600">(${mostHated.value ?? 0} pts)</span>`)}
+               ${htmlTeamsList(mostHated.teams)}
+        <span class="text-gray-600">(${mostHated.value ?? 0} pts)</span>
           </div>
           <div class="mb-1">
             <span class="font-medium">Most overrated team:</span>
-            ${htmlTeamsList(mostOver.teams, ` <span class="text-gray-600">(+${mostOver.value ?? 0})</span>`)}
+           ${htmlTeamsList(mostOver.teams)}
+        <span class="text-gray-600">(+${mostOver.value ?? 0})</span>
           </div>
           <div class="mb-1">
             <span class="font-medium">Most underrated team:</span>
-            ${htmlTeamsList(mostUnder.teams, ` <span class="text-gray-600">(+${mostUnder.value ?? 0})</span>`)}
+             ${htmlTeamsList(mostUnder.teams)}
+        <span class="text-gray-600">(-${mostUnder.value ?? 0})</span>
           </div>
           <div class="mb-1">
             <span class="font-medium">Best predicted team:</span>
-            ${htmlTeamsList(bestPred.teams, ` <span class="text-gray-600">(±${bestPred.value ?? 0})</span>`)}
+            ${htmlTeamsList(bestPred.teams)}
+        <span class="text-gray-600">(±${bestPred.value ?? 0})</span>
           </div>
         </div>
       </div>
