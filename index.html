@@ -826,162 +826,128 @@ function fixtureTimeFromId(fixtureId) {
   return Number.isFinite(n) ? n : 0;
 }
 
-// ——— Compute all stats up to currentGameweek ———
 async function computeSeasonStatsUpToCurrentGW() {
-  // Ensure we have cache up to currentGameweek (minimal fetch if missing)
-  const haveWeeks = Object.keys(gameweekCache).length > 0;
-  if (!haveWeeks) {
-    const fixtureDocs = await getDocs(collection(db, "fixtures"));
-    const allFixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
-    const weeks = [...new Set(allFixtures.map(f => f.gameweek))]
-      .filter(Boolean).map(String);
+  // Adjust how you determine the current GW if you have a better source:
+  const gwMax = typeof currentGameweek === "number" ? currentGameweek : 1;
 
-    for (const w of weeks) {
-      if (+w > +currentGameweek) continue;
-      const [predSnap, resSnap] = await Promise.all([
-        getDoc(doc(db, "predictions", w)),
-        getDoc(doc(db, "results", w))
-      ]);
-      const fixtures = allFixtures.filter(f => String(f.gameweek) === w);
-      gameweekCache[w] = gameweekCache[w] || {};
-      gameweekCache[w].fixtures = fixtures;
-      gameweekCache[w].predictions = predSnap.exists() ? predSnap.data() : {};
-      gameweekCache[w].results = resSnap.exists() ? resSnap.data() : {};
+  const toNum = v => Number(v ?? 0);
+  const outcomeFrom = (h, a) => (h > a ? "home" : h < a ? "away" : "draw");
+  const ptsFor = (outcome, side) => outcome === "draw" ? 1 : (outcome === side ? 3 : 0);
+
+  const fixturesByGW = {};
+  const resultsByGW  = {};
+  const predsByGW    = {};
+
+  // Firestore reads
+  for (let gw = 1; gw <= gwMax; gw++) {
+    const [fxDoc, rsDoc, prDoc] = await Promise.all([
+      getDoc(doc(db, "fixtures", String(gw))),
+      getDoc(doc(db, "results",  String(gw))),
+      getDoc(doc(db, "predictions", String(gw))),
+    ]);
+
+    // Fixtures: accept array or map
+    let fixtures = [];
+    if (fxDoc.exists()) {
+      const d = fxDoc.data();
+      if (Array.isArray(d.fixtures)) fixtures = d.fixtures;
+      else if (d && typeof d === "object") {
+        const maybe = d.fixtures || d;
+        fixtures = Array.isArray(maybe) ? maybe : Object.values(maybe || {});
+      }
+    }
+    fixturesByGW[gw] = fixtures
+      .filter(f => f && (f.home || f.homeTeam) && (f.away || f.awayTeam))
+      .map(f => ({
+        id: f.id ?? `${gw}_${(f.home||f.homeTeam)}_${(f.away||f.awayTeam)}`,
+        home: f.home || f.homeTeam,
+        away: f.away || f.awayTeam,
+      }));
+
+    resultsByGW[gw] = rsDoc.exists() ? (rsDoc.data() || {}) : {};
+    predsByGW[gw]   = prDoc.exists() ? (prDoc.data() || {}) : {};
+  }
+
+  // ----------------------------------------------------------
+  // Build playerPredictedTeamPoints (ALL predictions, even without results)
+  // and predictions.scoredByPlayer (ONLY fixtures WITH results)
+  // ----------------------------------------------------------
+  const playerPredictedTeamPoints = {}; // player -> { team -> totalPredPts }
+  const scoredByPlayer = {};            // player -> [{home,away,predHome,predAway,resHome,resAway}]
+
+  for (let gw = 1; gw <= gwMax; gw++) {
+    const fixtures = fixturesByGW[gw];
+    const resDoc  = resultsByGW[gw];   // { [fixtureId]: {home,away} } OR flat {homeTeam_awayTeam: {...}}
+    const predDoc = predsByGW[gw];     // { player: { [fixtureId]: {home,away} } }
+
+    // Normalize results into a lookup by fixtureId
+    const resultById = {};
+    // If results doc is keyed by fixtureId, use that; else try to match by (home,away)
+    for (const fx of fixtures) {
+      const fid = fx.id;
+      // common shapes
+      const r1 = resDoc[fid];
+      const r2 = resDoc?.results?.[fid];
+      // fallback: some stores use team key
+      const key3 = `${fx.home}__${fx.away}`;
+      const r3 = resDoc[key3];
+
+      const r = r1 || r2 || r3;
+      if (r && (r.home != null) && (r.away != null)) {
+        resultById[fid] = { resHome: toNum(r.home), resAway: toNum(r.away) };
+      }
+    }
+
+    // For each player
+    for (const player of Object.keys(predDoc || {})) {
+      const pMap = predDoc[player] || {};
+      playerPredictedTeamPoints[player] ||= {};
+      scoredByPlayer[player] ||= [];
+
+      for (const fx of fixtures) {
+        const fid = fx.id;
+
+        // predicted score (various possible shapes)
+        const p1 = pMap[fid];
+        const p2 = pMap?.predictions?.[fid];
+        const p3 = pMap?.[`${fx.home}__${fx.away}`];
+        const pred = p1 || p2 || p3;
+
+        if (!pred) continue;
+
+        const ph = toNum(pred.home ?? pred.predHome ?? pred.h);
+        const pa = toNum(pred.away ?? pred.predAway ?? pred.a);
+
+        // Add to "liked/hated" (predicted points for each team) — regardless of results
+        const predOutcome = outcomeFrom(ph, pa);
+        playerPredictedTeamPoints[player][fx.home] =
+          (playerPredictedTeamPoints[player][fx.home] || 0) + ptsFor(predOutcome, "home");
+        playerPredictedTeamPoints[player][fx.away] =
+          (playerPredictedTeamPoints[player][fx.away] || 0) + ptsFor(predOutcome, "away");
+
+        // If result exists, add to scoredByPlayer
+        const r = resultById[fid];
+        if (r) {
+          scoredByPlayer[player].push({
+            home: fx.home,
+            away: fx.away,
+            predHome: ph,
+            predAway: pa,
+            resHome: r.resHome,
+            resAway: r.resAway,
+          });
+        }
+      }
     }
   }
 
-  // 1) League table + form (up to currentGW)
-  const teamTable = {}; // team -> accumulator
-  const teamMatchesChrono = {}; // team -> array of 'W/D/L' ordered by time
-
-  // 2) Player predicted points per team
-  const playerTeamPred = {}; // user -> team -> predicted points
-  const predictionsScoredByPlayer = {}; // only predictions where a result exists
-
-  // Iterate all weeks <= current
-  const sortedWeeks = Object.keys(gameweekCache)
-    .map(String)
-    .filter(w => +w <= +currentGameweek)
-    .sort((a,b)=>+a - +b);
-
-  for (const w of sortedWeeks) {
-    const { fixtures = [], results = {}, predictions = {} } = gameweekCache[w] || {};
-
-    // Sort fixtures by their time (from id) for form chronology
-    const fixturesSorted = [...fixtures].sort((a,b) =>
-      fixtureTimeFromId(a.id) - fixtureTimeFromId(b.id)
-    );
-
-    for (const f of fixturesSorted) {
-      const fid = f.id;
-      const res = results[fid];
-      if (res && typeof res.home === "number" && typeof res.away === "number") {
-        const home = normalizeNameLeague(f.home);
-        const away = normalizeNameLeague(f.away);
-
-        teamTable[home] = teamTable[home] || teamStatsAccumulator();
-        teamTable[away] = teamTable[away] || teamStatsAccumulator();
-        teamMatchesChrono[home] = teamMatchesChrono[home] || [];
-        teamMatchesChrono[away] = teamMatchesChrono[away] || [];
-
-        // Update league aggregates
-        const out = matchOutcomeFromScore(res.home, res.away);
-        const homePts = pointsForOutcome(out, "home");
-        const awayPts = pointsForOutcome(out, "away");
-
-        const th = teamTable[home];
-        const ta = teamTable[away];
-
-        th.played++; ta.played++;
-        th.gf += res.home; th.ga += res.away;
-        ta.gf += res.away; ta.ga += res.home;
-        th.gd = th.gf - th.ga;
-        ta.gd = ta.gf - ta.ga;
-
-        if (out === "H") { th.wins++; ta.losses++; }
-        else if (out === "A") { ta.wins++; th.losses++; }
-        else { th.draws++; ta.draws++; }
-
-        th.points += homePts;
-        ta.points += awayPts;
-
-        // Form arrays (W/D/L)
-        teamMatchesChrono[home].push(out === "H" ? "W" : (out === "A" ? "L" : "D"));
-        teamMatchesChrono[away].push(out === "A" ? "W" : (out === "H" ? "L" : "D"));
-      }
-
-      // Predicted points per team (for each player)
-      const predsForFixture = predictions[fid] || {};
-      for (const [user, p] of Object.entries(predsForFixture)) {
-        if (!p || typeof p.home !== "number" || typeof p.away !== "number") continue;
-        const predictedOutcome = matchOutcomeFromScore(p.home, p.away);
-        const home = normalizeNameLeague(f.home);
-        const away = normalizeNameLeague(f.away);
-
-        playerTeamPred[user] = playerTeamPred[user] || {};
-        playerTeamPred[user][home] = (playerTeamPred[user][home] || 0) + pointsForOutcome(predictedOutcome, "home");
-        playerTeamPred[user][away] = (playerTeamPred[user][away] || 0) + pointsForOutcome(predictedOutcome, "away");
-  
-        // ---- (B) Save only SCORABLE predictions with the actual result ----
-  if (res && typeof res.home === "number" && typeof res.away === "number") {
-    (predictionsScoredByPlayer[user] ||= []).push({
-      gw: w,
-      fixtureId: fid,
-      home,
-      away,
-      predHome: p.home,
-      predAway: p.away,
-      resHome: res.home,
-      resAway: res.away
-    });
-  }
-      }
+  return {
+    currentGameweek: gwMax,
+    playerPredictedTeamPoints,
+    predictions: {
+      scoredByPlayer
     }
-  }
-
-  // Build league table array with positions
-  const teams = Object.keys(teamTable);
-  const tableArr = teams.map(team => ({
-    team,
-    ...teamTable[team], // played,wins,draws,losses,gf,ga,gd,points
-  })).sort((a, b) => {
-    if (b.points !== a.points) return b.points - a.points;
-    if (b.gd !== a.gd) return b.gd - a.gd;
-    if (b.gf !== a.gf) return b.gf - a.gf;
-    return a.team.localeCompare(b.team);
-  });
-
-  const positionByTeam = {};
-  tableArr.forEach((row, idx) => positionByTeam[row.team] = idx + 1);
-
-  // Attach last-6 form to each team (most recent last)
-  const teamsDoc = {};
-  for (const team of teams) {
-    const forms = teamMatchesChrono[team] || [];
-    const last6 = forms.slice(-6);
-    const t = teamTable[team];
-    teamsDoc[team] = {
-      form: last6,
-      position: positionByTeam[team] || null,
-      played: t.played,
-      wins: t.wins,
-      draws: t.draws,
-      losses: t.losses,
-      gf: t.gf,
-      ga: t.ga,
-      gd: t.gd,
-      points: t.points
-    };
-  }
-
-return {
-  currentGameweek: String(currentGameweek),
-  teams: teamsDoc,
-  playerPredictedTeamPoints: playerTeamPred,
-  predictions: {
-    scoredByPlayer: predictionsScoredByPlayer
-  }
-};
+  };
 }
 
 async function openLeagueTableModal() {
