@@ -105,6 +105,14 @@
         <div id="leaderboardWeekly" class="overflow-x-auto"></div>
       </div>
 
+<!-- Save Season Stats (David only) -->
+<div id="saveSeasonStatsWrap" class="mb-6 hidden">
+  <button id="saveSeasonStatsBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded">
+    Compute & Save Season Stats (to current GW)
+  </button>
+  <span id="saveSeasonStatsStatus" class="ml-3 text-sm text-gray-600"></span>
+</div>
+      
       <!-- Password Reset (David) -->
       <div id="passwordResetSection" class="hidden mb-8">
         <h2 class="text-lg font-semibold mb-2">Reset Player Password</h2>
@@ -292,6 +300,7 @@ loginBtn.onclick = async () => {
     if (user === "david") {
       document.getElementById("fixtureEditor").classList.remove("hidden");
       document.getElementById("passwordResetSection").classList.remove("hidden");
+      document.getElementById("saveSeasonStatsWrap").classList.remove("hidden");
       populatePasswordResetDropdown();
 
       const all = await getDocs(collection(db, "fixtures"));
@@ -731,6 +740,199 @@ function calculatePoints(pred, res) {
   return pts;
 }
 
+// ——— Helpers ———
+function matchOutcomeFromScore(h, a) {
+  if (h > a) return "H";
+  if (h < a) return "A";
+  return "D";
+}
+function pointsForOutcome(outcome, asTeam) {
+  // asTeam: 'home' or 'away'
+  if (outcome === "H") return asTeam === "home" ? 3 : 0;
+  if (outcome === "A") return asTeam === "away" ? 3 : 0;
+  return 1; // draw
+}
+function teamStatsAccumulator() {
+  return { played:0, wins:0, draws:0, losses:0, gf:0, ga:0, gd:0, points:0, forms:[] };
+}
+function normalizeNameLeague(name) {
+  // keep exactly your display names; tweak mappings if needed
+  return name;
+}
+
+// Extract numeric timestamp from fixture id "..._<ts>"
+function fixtureTimeFromId(fixtureId) {
+  const tail = fixtureId.split("_").pop();
+  const n = Number(tail);
+  return Number.isFinite(n) ? n : 0;
+}
+
+// ——— Compute all stats up to currentGameweek ———
+async function computeSeasonStatsUpToCurrentGW() {
+  // Ensure we have cache up to currentGameweek (minimal fetch if missing)
+  const haveWeeks = Object.keys(gameweekCache).length > 0;
+  if (!haveWeeks) {
+    const fixtureDocs = await getDocs(collection(db, "fixtures"));
+    const allFixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
+    const weeks = [...new Set(allFixtures.map(f => f.gameweek))]
+      .filter(Boolean).map(String);
+
+    for (const w of weeks) {
+      if (+w > +currentGameweek) continue;
+      const [predSnap, resSnap] = await Promise.all([
+        getDoc(doc(db, "predictions", w)),
+        getDoc(doc(db, "results", w))
+      ]);
+      const fixtures = allFixtures.filter(f => String(f.gameweek) === w);
+      gameweekCache[w] = gameweekCache[w] || {};
+      gameweekCache[w].fixtures = fixtures;
+      gameweekCache[w].predictions = predSnap.exists() ? predSnap.data() : {};
+      gameweekCache[w].results = resSnap.exists() ? resSnap.data() : {};
+    }
+  }
+
+  // 1) League table + form (up to currentGW)
+  const teamTable = {}; // team -> accumulator
+  const teamMatchesChrono = {}; // team -> array of 'W/D/L' ordered by time
+
+  // 2) Player predicted points per team
+  const playerTeamPred = {}; // user -> team -> predicted points
+
+  // Iterate all weeks <= current
+  const sortedWeeks = Object.keys(gameweekCache)
+    .map(String)
+    .filter(w => +w <= +currentGameweek)
+    .sort((a,b)=>+a - +b);
+
+  for (const w of sortedWeeks) {
+    const { fixtures = [], results = {}, predictions = {} } = gameweekCache[w] || {};
+
+    // Sort fixtures by their time (from id) for form chronology
+    const fixturesSorted = [...fixtures].sort((a,b) =>
+      fixtureTimeFromId(a.id) - fixtureTimeFromId(b.id)
+    );
+
+    for (const f of fixturesSorted) {
+      const fid = f.id;
+      const res = results[fid];
+      if (res && typeof res.home === "number" && typeof res.away === "number") {
+        const home = normalizeNameLeague(f.home);
+        const away = normalizeNameLeague(f.away);
+
+        teamTable[home] = teamTable[home] || teamStatsAccumulator();
+        teamTable[away] = teamTable[away] || teamStatsAccumulator();
+        teamMatchesChrono[home] = teamMatchesChrono[home] || [];
+        teamMatchesChrono[away] = teamMatchesChrono[away] || [];
+
+        // Update league aggregates
+        const out = matchOutcomeFromScore(res.home, res.away);
+        const homePts = pointsForOutcome(out, "home");
+        const awayPts = pointsForOutcome(out, "away");
+
+        const th = teamTable[home];
+        const ta = teamTable[away];
+
+        th.played++; ta.played++;
+        th.gf += res.home; th.ga += res.away;
+        ta.gf += res.away; ta.ga += res.home;
+        th.gd = th.gf - th.ga;
+        ta.gd = ta.gf - ta.ga;
+
+        if (out === "H") { th.wins++; ta.losses++; }
+        else if (out === "A") { ta.wins++; th.losses++; }
+        else { th.draws++; ta.draws++; }
+
+        th.points += homePts;
+        ta.points += awayPts;
+
+        // Form arrays (W/D/L)
+        teamMatchesChrono[home].push(out === "H" ? "W" : (out === "A" ? "L" : "D"));
+        teamMatchesChrono[away].push(out === "A" ? "W" : (out === "H" ? "L" : "D"));
+      }
+
+      // Predicted points per team (for each player)
+      const predsForFixture = predictions[fid] || {};
+      for (const [user, p] of Object.entries(predsForFixture)) {
+        if (!p || typeof p.home !== "number" || typeof p.away !== "number") continue;
+        const predictedOutcome = matchOutcomeFromScore(p.home, p.away);
+        const home = normalizeNameLeague(f.home);
+        const away = normalizeNameLeague(f.away);
+
+        playerTeamPred[user] = playerTeamPred[user] || {};
+        playerTeamPred[user][home] = (playerTeamPred[user][home] || 0) + pointsForOutcome(predictedOutcome, "home");
+        playerTeamPred[user][away] = (playerTeamPred[user][away] || 0) + pointsForOutcome(predictedOutcome, "away");
+      }
+    }
+  }
+
+  // Build league table array with positions
+  const teams = Object.keys(teamTable);
+  const tableArr = teams.map(team => ({
+    team,
+    ...teamTable[team], // played,wins,draws,losses,gf,ga,gd,points
+  })).sort((a, b) => {
+    if (b.points !== a.points) return b.points - a.points;
+    if (b.gd !== a.gd) return b.gd - a.gd;
+    if (b.gf !== a.gf) return b.gf - a.gf;
+    return a.team.localeCompare(b.team);
+  });
+
+  const positionByTeam = {};
+  tableArr.forEach((row, idx) => positionByTeam[row.team] = idx + 1);
+
+  // Attach last-6 form to each team (most recent last)
+  const teamsDoc = {};
+  for (const team of teams) {
+    const forms = teamMatchesChrono[team] || [];
+    const last6 = forms.slice(-6);
+    const t = teamTable[team];
+    teamsDoc[team] = {
+      form: last6,
+      position: positionByTeam[team] || null,
+      played: t.played,
+      wins: t.wins,
+      draws: t.draws,
+      losses: t.losses,
+      gf: t.gf,
+      ga: t.ga,
+      gd: t.gd,
+      points: t.points
+    };
+  }
+
+  return {
+    currentGameweek: String(currentGameweek),
+    teams: teamsDoc,
+    playerPredictedTeamPoints: playerTeamPred
+  };
+}
+
+// ——— Persist to Firestore ———
+async function saveSeasonStatsToFirestore() {
+  const statusEl = document.getElementById("saveSeasonStatsStatus");
+  try {
+    statusEl.textContent = "Computing...";
+    const payload = await computeSeasonStatsUpToCurrentGW();
+
+    await setDoc(
+      doc(db, "stats", "season"),
+      {
+        ...payload,
+        updatedAt: new Date().toISOString()
+      },
+      { merge: true }
+    );
+
+    statusEl.textContent = "✅ Saved season stats.";
+    setTimeout(() => statusEl.textContent = "", 3000);
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = "❌ Failed to save season stats. See console.";
+    setTimeout(() => statusEl.textContent = "", 6000);
+  }
+}
+
+    
 function renderLeaderboards(allPredictions, allResults, allFixtures) {
   const overall = {}, exacts = {}, outcomes = {}, counts = {};
   const weekly = {}, wExacts = {}, wOutcomes = {}, wCounts = {};
@@ -959,6 +1161,12 @@ if (performance?.navigation?.type !== 1) {
   sessionStorage.clear();
 }
 
+document.getElementById("saveSeasonStatsBtn")?.addEventListener("click", () => {
+  if (!confirm(`Compute & save season stats up to GW ${currentGameweek}?`)) return;
+  saveSeasonStatsToFirestore();
+});
+
+    
 window.addEventListener("DOMContentLoaded", async () => {
   const savedUser = localStorage.getItem("loggedInUser");
   const savedGameweek = localStorage.getItem("selectedGameweek");
