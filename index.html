@@ -1094,6 +1094,34 @@ document.addEventListener("click", async (e) => {
     const data = snap.data();
     let html = `📊 Head-to-Head: ${home} vs ${away}\n\n`;
 
+    // 🔹 Fetch season stats (league table + form)
+    let statsDoc;
+    try {
+      const statsSnap = await getDoc(doc(db, "stats", "season"));
+      if (statsSnap.exists()) statsDoc = statsSnap.data();
+    } catch (err) {
+      console.error("Stats fetch failed", err);
+    }
+
+    if (statsDoc?.teams) {
+      const tHome = statsDoc.teams[home];
+      const tAway = statsDoc.teams[away];
+
+      // Form guide renderer
+      function renderForm(arr) {
+        return (arr || []).map(r => {
+          if (r === "W") return `<span class="text-green-600 font-bold">W</span>`;
+          if (r === "L") return `<span class="text-red-600 font-bold">L</span>`;
+          return `<span class="text-gray-600 font-bold">D</span>`;
+        }).join(" ");
+      }
+
+      html += `Form Guide:\n- ${home}: ${renderForm(tHome?.form)}\n- ${away}: ${renderForm(tAway?.form)}\n\n`;
+
+      html += `League Position:\n- ${home}: ${tHome?.position ?? "-"} (${tHome?.points ?? 0} pts)\n- ${away}: ${tAway?.position ?? "-"} (${tAway?.points ?? 0} pts)\n\n`;
+    }
+
+   
     // Last 5 matches
     html += "Last 5 matches:\n";
     if (data.last5?.length) {
