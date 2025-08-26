@@ -1104,8 +1104,8 @@ document.addEventListener("click", async (e) => {
     }
 
     if (statsDoc?.teams) {
-      const tHome = statsDoc.teams[home];
-      const tAway = statsDoc.teams[away];
+      const tHome = statsDoc.teams[rawHome];
+      const tAway = statsDoc.teams[rawAway];
 
       // Form guide renderer
       function renderForm(arr) {
@@ -1147,7 +1147,7 @@ document.addEventListener("click", async (e) => {
     const as = data.streaks?.[away];
     html += `\n\nLongest Winning Streaks:\n- ${home}: ${hs?.count || 0} (${hs?.span || "–"})\n- ${away}: ${as?.count || 0} (${as?.span || "–"})`;
 
-    content.textContent = html;
+    content.innerHTML = html.replace(/\n/g, "<br>");
   }
 
   modal.classList.remove("hidden");
