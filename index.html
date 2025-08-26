@@ -72,6 +72,21 @@
         <select id="gameweekSelect" class="border p-2"></select>
         <span id="gameweekDeadline" class="ml-4 text-sm text-gray-600"></span>
       </div>
+      <!-- Stats buttons (visible to all logged-in users) -->
+<div id="statsButtons" class="mb-4 flex gap-2" style="display:none;">
+  <button id="btnLeagueTable" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-sm">League Table</button>
+  <button id="btnFormGuide"  class="bg-gray-700 hover:bg-gray-800 text-white px-3 py-1 rounded text-sm">Form Guide</button>
+</div>
+
+<!-- Stats Modal -->
+<div id="statsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+  <div class="bg-white p-6 rounded shadow-lg max-w-3xl w-full">
+    <h2 id="statsModalTitle" class="text-lg font-semibold mb-4"></h2>
+    <div id="statsModalContent" class="text-sm max-h-96 overflow-y-auto"></div>
+    <button id="closeStatsBtn" class="mt-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded">Close</button>
+  </div>
+</div>
+
       <!-- Fixture Editor (David) -->
       <div id="fixtureEditor" class="mb-6 hidden">
         <h2 class="text-lg font-semibold mb-2">Edit Fixtures</h2>
@@ -292,6 +307,7 @@ loginBtn.onclick = async () => {
     loginSection.style.display = "none";
     appDiv.style.display = "block";
     welcomeUser.textContent = `Welcome, ${user.charAt(0).toUpperCase() + user.slice(1)}`;
+    document.getElementById("statsButtons").style.display = "flex";
     document.getElementById("leaderboardOverall").classList.add("hidden");
     document.getElementById("leaderboardOverallLoading").classList.remove("hidden");
     document.getElementById("leaderboardOverall").innerHTML = "";
@@ -741,6 +757,28 @@ function calculatePoints(pred, res) {
 }
 
 // ——— Helpers ———
+let _seasonStatsCache = null;
+
+async function getSeasonStats() {
+  if (_seasonStatsCache) return _seasonStatsCache;
+  const s = await getDoc(doc(db, "stats", "season"));
+  if (!s.exists()) throw new Error("stats/season not found. Have David pressed 'Compute & Save Season Stats'?");
+  _seasonStatsCache = s.data();
+  return _seasonStatsCache;
+}
+
+function renderFormLetters(arr) {
+  return (arr || []).map(r => {
+    if (r === "W") return `<span class="text-green-600 font-bold">W</span>`;
+    if (r === "L") return `<span class="text-red-600 font-bold">L</span>`;
+    return `<span class="text-gray-600 font-bold">D</span>`;
+  }).join(" ");
+}
+
+function formPoints(arr) {
+  return (arr || []).reduce((sum, r) => sum + (r === "W" ? 3 : r === "D" ? 1 : 0), 0);
+}
+
 function matchOutcomeFromScore(h, a) {
   if (h > a) return "H";
   if (h < a) return "A";
@@ -907,6 +945,129 @@ async function computeSeasonStatsUpToCurrentGW() {
   };
 }
 
+async function openLeagueTableModal() {
+  const stats = await getSeasonStats();
+  const teams = stats.teams || {};
+  const gw = stats.currentGameweek ?? currentGameweek;
+
+  // Build array and sort by position ASC
+  const rows = Object.entries(teams).map(([team, t]) => ({
+    team,
+    pos: t.position ?? 9999,
+    W: t.wins ?? 0,
+    D: t.draws ?? 0,
+    L: t.losses ?? 0,
+    Pts: t.points ?? 0,
+    GF: t.gf ?? 0,
+    GA: t.ga ?? 0,
+    GD: (t.gd ?? ((t.gf ?? 0) - (t.ga ?? 0)))
+  })).sort((a,b)=> a.pos - b.pos || a.team.localeCompare(b.team));
+
+  const thead = `
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="px-2 py-1 text-left">Pos</th>
+        <th class="px-2 py-1 text-left">Team</th>
+        <th class="px-2 py-1 text-right">W</th>
+        <th class="px-2 py-1 text-right">D</th>
+        <th class="px-2 py-1 text-right">L</th>
+        <th class="px-2 py-1 text-right">Pts</th>
+        <th class="px-2 py-1 text-right">GF</th>
+        <th class="px-2 py-1 text-right">GA</th>
+        <th class="px-2 py-1 text-right">GD</th>
+      </tr>
+    </thead>`;
+
+  const tbody = rows.map(r => `
+    <tr class="hover:bg-gray-50">
+      <td class="px-2 py-1"><span class="text-red-600 font-bold">${r.pos}.</span></td>
+      <td class="px-2 py-1">${r.team}</td>
+      <td class="px-2 py-1 text-right">${r.W}</td>
+      <td class="px-2 py-1 text-right">${r.D}</td>
+      <td class="px-2 py-1 text-right">${r.L}</td>
+      <td class="px-2 py-1 text-right font-semibold">${r.Pts}</td>
+      <td class="px-2 py-1 text-right">${r.GF}</td>
+      <td class="px-2 py-1 text-right">${r.GA}</td>
+      <td class="px-2 py-1 text-right">${r.GD}</td>
+    </tr>
+  `).join("");
+
+  document.getElementById("statsModalTitle").textContent =
+    `League Table (up to and including Gameweek ${gw})`;
+
+  document.getElementById("statsModalContent").innerHTML = `
+    <div class="overflow-x-auto">
+      <table class="table-auto w-full border text-sm">
+        ${thead}
+        <tbody>${tbody}</tbody>
+      </table>
+    </div>
+  `;
+
+  document.getElementById("statsModal").classList.remove("hidden");
+}
+
+async function openFormGuideModal() {
+  const stats = await getSeasonStats();
+  const teams = stats.teams || {};
+  const gw = stats.currentGameweek ?? currentGameweek;
+
+  // sort by form points (last-6), then GD, then GF, then team
+  const rows = Object.entries(teams).map(([team, t]) => {
+    const form = t.form || [];
+    const last6 = form.slice(-6);
+    return {
+      team,
+      pos: t.position ?? 9999,
+      last6,
+      last6Pts: formPoints(last6),
+      gd: t.gd ?? ((t.gf ?? 0)-(t.ga ?? 0)),
+      gf: t.gf ?? 0
+    };
+  }).sort((a,b) =>
+    b.last6Pts - a.last6Pts ||
+    b.gd - a.gd ||
+    b.gf - a.gf ||
+    a.team.localeCompare(b.team)
+  );
+
+  const list = rows.map(r => `
+    <div class="flex items-center justify-between py-1 border-b">
+      <div class="flex items-center gap-2">
+        <span class="text-red-600 font-bold">${r.pos}.</span>
+        <span class="font-medium">${r.team}</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="whitespace-nowrap">${renderFormLetters(r.last6)}</span>
+        <span class="text-xs text-gray-600">(${r.last6Pts} pts)</span>
+      </div>
+    </div>
+  `).join("");
+
+  document.getElementById("statsModalTitle").textContent =
+    `Form Guide (last 6, up to and including Gameweek ${gw})`;
+
+  document.getElementById("statsModalContent").innerHTML = `
+    <div class="text-sm">
+      ${list}
+    </div>
+  `;
+
+  document.getElementById("statsModal").classList.remove("hidden");
+}
+
+// Buttons + close
+document.getElementById("btnLeagueTable")?.addEventListener("click", () => {
+  openLeagueTableModal().catch(err => alert(err.message || String(err)));
+});
+document.getElementById("btnFormGuide")?.addEventListener("click", () => {
+  openFormGuideModal().catch(err => alert(err.message || String(err)));
+});
+document.getElementById("closeStatsBtn")?.addEventListener("click", () => {
+  document.getElementById("statsModal").classList.add("hidden");
+});
+
+    
 // ——— Persist to Firestore ———
 async function saveSeasonStatsToFirestore() {
   const statusEl = document.getElementById("saveSeasonStatsStatus");
