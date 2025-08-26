@@ -309,6 +309,10 @@ loginBtn.onclick = async () => {
     appDiv.style.display = "block";
     welcomeUser.textContent = `Welcome, ${user.charAt(0).toUpperCase() + user.slice(1)}`;
     document.getElementById("statsButtons").style.display = "flex";
+    ["btnLeagueTable","btnFormGuide","btnPredStats"].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.disabled = false;
+});
     document.getElementById("leaderboardOverall").classList.add("hidden");
     document.getElementById("leaderboardOverallLoading").classList.remove("hidden");
     document.getElementById("leaderboardOverall").innerHTML = "";
