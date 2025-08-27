@@ -1016,7 +1016,7 @@ async function openLeagueTableModal() {
   `).join("");
 
   document.getElementById("statsModalTitle").textContent =
-    `League Table (up to and including Gameweek ${gw})`;
+    `League Table`;
 
   document.getElementById("statsModalContent").innerHTML = `
     <div class="overflow-x-auto">
@@ -1068,7 +1068,7 @@ async function openFormGuideModal() {
   `).join("");
 
   document.getElementById("statsModalTitle").textContent =
-    `Form Guide (last 6, up to and including Gameweek ${gw})`;
+    `Form Guide (last 6)`;
 
   document.getElementById("statsModalContent").innerHTML = `
     <div class="text-sm">
@@ -1222,7 +1222,7 @@ async function openPredictionStatsModal() {
   }
 
   document.getElementById("statsModalTitle").textContent =
-    `Predictions stats (up to and including Gameweek ${gw})`;
+    `Predictions stats`;
   document.getElementById("statsModalContent").innerHTML =
     html || "<div class='text-sm text-gray-600'>No data.</div>";
   document.getElementById("statsModal").classList.remove("hidden");
@@ -1253,12 +1253,10 @@ async function saveSeasonStatsToFirestore() {
 
     await setDoc(doc(db, "stats", "season"), {
       ...payload,
-      // keep the old field name pointing to the ALL totals so old UI keeps working
-      playerPredictedTeamPoints: payload.playerPredictedTeamPointsAll,
       updatedAt: new Date().toISOString()
     }, { merge: true });
 
-    // bust local cache so the next modal read pulls fresh structure
+    // clear local cache so next read pulls fresh doc
     _seasonStatsCache = null;
 
     statusEl.textContent = "✅ Saved season stats.";
@@ -1432,7 +1430,7 @@ document.addEventListener("click", async (e) => {
     const data = snap.data();
     let html = `📊 Head-to-Head: ${home} vs ${away}\n\n`;
 
-    // 🔹 Fetch season stats (league table + form)
+    // 🔹 Fetch season stats (league table + form)	
     let statsDoc;
     try {
       const statsSnap = await getDoc(doc(db, "stats", "season"));
@@ -1456,7 +1454,7 @@ document.addEventListener("click", async (e) => {
         }).join(" ");
       }
 
-      html += `Form Guide (up to and including Gameweek ${gwNumber}):\n- ${home}: ${renderForm(tHome?.form)}\n- ${away}: ${renderForm(tAway?.form)}\n\n`;
+      html += `Form Guide:\n- ${home}: ${renderForm(tHome?.form)}\n- ${away}: ${renderForm(tAway?.form)}\n\n`;
 
 
 function renderPosition(pos) {
@@ -1464,7 +1462,7 @@ function renderPosition(pos) {
   return `<span class="text-red-600 font-bold">${pos}.</span>`;
 }
 
-html += `League Position (up to and including Gameweek ${gwNumber}):\n` +
+html += `League Position:\n` +
         `- ${home}: ${renderPosition(tHome?.position)} (${tHome?.points ?? 0} pts)\n` +
         `- ${away}: ${renderPosition(tAway?.position)} (${tAway?.points ?? 0} pts)\n\n`;      
     }
