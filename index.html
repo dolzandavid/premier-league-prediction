@@ -846,7 +846,7 @@ function fixtureTimeFromId(fixtureId) {
 
 // ——— Compute all stats up to currentGameweek ———
 async function computeSeasonStatsUpToCurrentGW() {
-  // Ensure we have all weeks ≤ current in cache (even if cache already exists)
+  // Ensure cache has all weeks ≤ currentGW
   const fixtureDocs = await getDocs(collection(db, "fixtures"));
   const allFixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
   const allWeeks = [...new Set(allFixtures.map(f => String(f.gameweek)))].filter(Boolean);
@@ -866,26 +866,21 @@ async function computeSeasonStatsUpToCurrentGW() {
     }
   }
 
-  // 1) League table + form (from fixtures WITH results)
-  const teamTable = {};               // team -> accumulator
-  const teamMatchesChrono = {};       // team -> ['W','D','L',...]
-  const teamRealPoints = {};          // team -> points (only where result exists)
+  // Real table + helper maps
+  const teamTable = {};         // team -> aggregates (from results only)
+  const teamMatchesChrono = {}; // team -> ['W','D','L',...]
+  const teamRealPoints = {};    // team -> real points
 
-  // 2) Predicted points per team:
-  //    - All predictions (even if no result yet)
-  //    - Only predictions for fixtures that already have a result (so they’re comparable to real points)
-  const playerTeamPredAll    = {};    // user -> team -> predicted pts (ALL predictions)
-  const playerTeamPredScored = {};    // user -> team -> predicted pts (ONLY fixtures with results)
+  // Predicted points per team (two flavors)
+  const playerTeamPredAll    = {}; // user -> team -> pts (ALL predictions)
+  const playerTeamPredScored = {}; // user -> team -> pts (ONLY fixtures WITH results)
 
   const sortedWeeks = Object.keys(gameweekCache)
-    .map(String)
-    .filter(w => +w <= +currentGameweek)
+    .map(String).filter(w => +w <= +currentGameweek)
     .sort((a,b)=>+a - +b);
 
   for (const w of sortedWeeks) {
     const { fixtures = [], results = {}, predictions = {} } = gameweekCache[w] || {};
-
-    // sort by ID tail timestamp (if present) just for consistent chronology
     const fixturesSorted = [...fixtures].sort((a,b) => fixtureTimeFromId(a.id) - fixtureTimeFromId(b.id));
 
     for (const f of fixturesSorted) {
@@ -894,11 +889,10 @@ async function computeSeasonStatsUpToCurrentGW() {
       const home = normalizeNameLeague(f.home);
       const away = normalizeNameLeague(f.away);
 
-      // ---------- REAL table (only if result exists) ----------
+      // ----- REAL table (only when result exists)
       if (res && Number.isFinite(res.home) && Number.isFinite(res.away)) {
         const out = matchOutcomeFromScore(res.home, res.away);
 
-        // init aggregates
         teamTable[home] = teamTable[home] || teamStatsAccumulator();
         teamTable[away] = teamTable[away] || teamStatsAccumulator();
         teamMatchesChrono[home] = teamMatchesChrono[home] || [];
@@ -907,45 +901,35 @@ async function computeSeasonStatsUpToCurrentGW() {
         teamRealPoints[away] = teamRealPoints[away] || 0;
 
         const th = teamTable[home], ta = teamTable[away];
-
         const homePts = pointsForOutcome(out, "home");
         const awayPts = pointsForOutcome(out, "away");
 
         th.played++; ta.played++;
         th.gf += res.home; th.ga += res.away;
         ta.gf += res.away; ta.ga += res.home;
-        th.gd = th.gf - th.ga;
-        ta.gd = ta.gf - ta.ga;
-
+        th.gd = th.gf - th.ga; ta.gd = ta.gf - ta.ga;
         if (out === "H") { th.wins++; ta.losses++; }
         else if (out === "A") { ta.wins++; th.losses++; }
         else { th.draws++; ta.draws++; }
-
-        th.points += homePts;
-        ta.points += awayPts;
-
-        teamRealPoints[home] += homePts;
-        teamRealPoints[away] += awayPts;
+        th.points += homePts; ta.points += awayPts;
+        teamRealPoints[home] += homePts; teamRealPoints[away] += awayPts;
 
         teamMatchesChrono[home].push(out === "H" ? "W" : (out === "A" ? "L" : "D"));
         teamMatchesChrono[away].push(out === "A" ? "W" : (out === "H" ? "L" : "D"));
       }
 
-      // ---------- PREDICTED totals (for each player) ----------
+      // ----- PREDICTED points (always add to ALL; add to SCORED only if result exists)
       const predsForFixture = predictions[fid] || {};
       for (const [user, p] of Object.entries(predsForFixture)) {
         if (!p || !Number.isFinite(p.home) || !Number.isFinite(p.away)) continue;
-
         const predictedOutcome = matchOutcomeFromScore(p.home, p.away);
         const homePredPts = pointsForOutcome(predictedOutcome, "home");
         const awayPredPts = pointsForOutcome(predictedOutcome, "away");
 
-        // ALL predictions
         (playerTeamPredAll[user] ||= {});
         playerTeamPredAll[user][home] = (playerTeamPredAll[user][home] || 0) + homePredPts;
         playerTeamPredAll[user][away] = (playerTeamPredAll[user][away] || 0) + awayPredPts;
 
-        // ONLY fixtures with results
         if (res && Number.isFinite(res.home) && Number.isFinite(res.away)) {
           (playerTeamPredScored[user] ||= {});
           playerTeamPredScored[user][home] = (playerTeamPredScored[user][home] || 0) + homePredPts;
@@ -955,29 +939,21 @@ async function computeSeasonStatsUpToCurrentGW() {
     }
   }
 
-  // Build league table with positions (from teamTable)
+  // Build league table positions from results
   const teams = Object.keys(teamTable);
   const tableArr = teams.map(team => ({
-    team,
-    ...teamTable[team],
-  })).sort((a, b) => {
-    if (b.points !== a.points) return b.points - a.points;
-    if (b.gd     !== a.gd)     return b.gd     - a.gd;
-    if (b.gf     !== a.gf)     return b.gf     - a.gf;
-    return a.team.localeCompare(b.team);
-  });
+    team, ...teamTable[team],
+  })).sort((a,b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf || a.team.localeCompare(b.team));
 
   const positionByTeam = {};
-  tableArr.forEach((row, idx) => positionByTeam[row.team] = idx + 1);
+  tableArr.forEach((row, i) => positionByTeam[row.team] = i + 1);
 
   const teamsDoc = {};
   for (const team of teams) {
-    const forms = teamMatchesChrono[team] || [];
-    const last6 = forms.slice(-6);
     const t = teamTable[team];
+    const last6 = (teamMatchesChrono[team] || []).slice(-6);
     teamsDoc[team] = {
-      form: last6,
-      position: positionByTeam[team] || null,
+      form: last6, position: positionByTeam[team] || null,
       played: t.played, wins: t.wins, draws: t.draws, losses: t.losses,
       gf: t.gf, ga: t.ga, gd: t.gd, points: t.points
     };
@@ -985,10 +961,10 @@ async function computeSeasonStatsUpToCurrentGW() {
 
   return {
     currentGameweek: String(currentGameweek),
-    teams: teamsDoc,                       // built from real results
-    teamRealPoints,                        // real points by team (results only)
+    teams: teamsDoc,
+    teamRealPoints,
     playerPredictedTeamPointsAll:    playerTeamPredAll,
-    playerPredictedTeamPointsScored: playerTeamPredScored
+    playerPredictedTeamPointsScored: playerTeamPredScored,
   };
 }
 
@@ -1275,14 +1251,15 @@ async function saveSeasonStatsToFirestore() {
     statusEl.textContent = "Computing...";
     const payload = await computeSeasonStatsUpToCurrentGW();
 
-    await setDoc(
-      doc(db, "stats", "season"),
-      {
-        ...payload,
-        updatedAt: new Date().toISOString()
-      },
-      { merge: true }
-    );
+    await setDoc(doc(db, "stats", "season"), {
+      ...payload,
+      // keep the old field name pointing to the ALL totals so old UI keeps working
+      playerPredictedTeamPoints: payload.playerPredictedTeamPointsAll,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    // bust local cache so the next modal read pulls fresh structure
+    _seasonStatsCache = null;
 
     statusEl.textContent = "✅ Saved season stats.";
     setTimeout(() => statusEl.textContent = "", 3000);
