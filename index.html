@@ -1419,20 +1419,19 @@ document.getElementById("addFixtureBtn").onclick = async () => {
     home,
     away,
     gameweek: currentGameweek, // ✅ Required for onSnapshot to work
-    order: nextOrder            // ✅ NEW
+    order: nextOrder           // ✅ NEW
   });
-};
 
   // Clear input fields
   document.getElementById("newHomeTeam").value = "";
   document.getElementById("newAwayTeam").value = "";
 
-  // ✅ No need to re-subscribe — snapshot will pick up the change
-  // Just clear cache and re-render locally
-  delete gameweekCache[currentGameweek];
+  // If you rely on onSnapshot to refill cache, you *can* clear it:
+  // delete gameweekCache[currentGameweek];
 
-  renderGameweek(); // 👈 You may want this for instant UI feedback
-};
+  // Re-render for instant feedback
+  renderGameweek();
+}; // ✅ this is the only closing brace you need
 
 document.getElementById("setDeadlineBtn").onclick = async () => {
   const deadline = document.getElementById("deadlineInput").value;
