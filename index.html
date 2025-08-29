@@ -877,7 +877,8 @@ async function computeSeasonStatsUpToCurrentGW() {
   const teamRealPoints = {};    // team -> real points
 
   // Predicted points per team (two flavors)
-  const playerTeamPredAll    = {}; // user -> team -> pts (ALL predictions)
+  // CHANGED: values are now objects { pts, gf, ga } for ALL predictions
+  const playerTeamPredAll    = {}; // user -> team -> { pts,gf,ga }
   const playerTeamPredScored = {}; // user -> team -> pts (ONLY fixtures WITH results)
 
   const sortedWeeks = Object.keys(gameweekCache)
@@ -931,9 +932,15 @@ async function computeSeasonStatsUpToCurrentGW() {
         const homePredPts = pointsForOutcome(predictedOutcome, "home");
         const awayPredPts = pointsForOutcome(predictedOutcome, "away");
 
+        // === MINIMAL CHANGE START: accumulate {pts,gf,ga} for ALL predictions
         (playerTeamPredAll[user] ||= {});
-        playerTeamPredAll[user][home] = (playerTeamPredAll[user][home] || 0) + homePredPts;
-        playerTeamPredAll[user][away] = (playerTeamPredAll[user][away] || 0) + awayPredPts;
+        const aggH = (playerTeamPredAll[user][home] ||= { pts: 0, gf: 0, ga: 0 });
+        const aggA = (playerTeamPredAll[user][away] ||= { pts: 0, gf: 0, ga: 0 });
+
+        aggH.pts += homePredPts;  aggA.pts += awayPredPts;
+        aggH.gf  += p.home;       aggA.gf  += p.away;
+        aggH.ga  += p.away;       aggA.ga  += p.home;
+        // === MINIMAL CHANGE END
 
         if (res && Number.isFinite(res.home) && Number.isFinite(res.away)) {
           (playerTeamPredScored[user] ||= {});
@@ -968,8 +975,8 @@ async function computeSeasonStatsUpToCurrentGW() {
     currentGameweek: String(currentGameweek),
     teams: teamsDoc,
     teamRealPoints,
-    playerPredictedTeamPointsAll:    playerTeamPredAll,
-    playerPredictedTeamPointsScored: playerTeamPredScored,
+    playerPredictedTeamPointsAll:    playerTeamPredAll,    // NOW: { pts,gf,ga }
+    playerPredictedTeamPointsScored: playerTeamPredScored, // unchanged (number pts)
   };
 }
 
@@ -1127,8 +1134,8 @@ async function openPredictionStatsModal() {
       );
 
   // Predictions saved in Firestore by your compute/save step
-  const perPlayerAll    = stats.playerPredictedTeamPointsAll    || {};
-  const perPlayerScored = stats.playerPredictedTeamPointsScored || {};
+  const perPlayerAll    = stats.playerPredictedTeamPointsAll    || {}; // NOW: { team: {pts,gf,ga} }
+  const perPlayerScored = stats.playerPredictedTeamPointsScored || {}; // { team: pts }
 
   const realTeams = new Set(Object.keys(teamRealPoints));
   const realTeamsArray = Array.from(realTeams);
@@ -1142,16 +1149,21 @@ async function openPredictionStatsModal() {
   ])).sort();
 
   for (const player of players) {
-    const tAll    = perPlayerAll[player]    || {};
-    const tScored = perPlayerScored[player] || {};
+    const tAllRaw = perPlayerAll[player]    || {}; // team -> {pts,gf,ga} OR legacy number
+    const tScored = perPlayerScored[player] || {}; // team -> pts
 
-    // ----- Most liked / Most hated (use ALL predictions) -----
-    const predictedAll = { ...tAll }; // team -> predicted pts from all fixtures
+    // --- Map ALL to pure points for liked/hated (backward compatible) ---
+    const predictedAllPts = Object.fromEntries(
+      Object.entries(tAllRaw).map(([team, v]) => [
+        team,
+        (typeof v === "number") ? v : Number(v?.pts ?? 0)
+      ])
+    );
 
-    const mostLiked = pickTeamsByValue(predictedAll, v => v);
-
+    // ----- Most liked / Most hated (use ALL predictions, by pts) -----
+    const mostLiked = pickTeamsByValue(predictedAllPts, v => v);
     const mostHated = (() => {
-      const entries = Object.entries(predictedAll);
+      const entries = Object.entries(predictedAllPts);
       if (entries.length === 0) return { value: null, teams: [] };
       let bestVal = null, teams = [];
       for (const [team, v] of entries) {
@@ -1162,7 +1174,7 @@ async function openPredictionStatsModal() {
       return { value: -bestVal, teams };
     })();
 
-    // ----- Over/Under/Best predicted (use ONLY scored predictions vs real) -----
+    // ----- Over/Under/Best predicted (ONLY scored predictions vs real) -----
     const predictedScored = {};
     for (const team of realTeamsArray) {
       predictedScored[team] = tScored[team] ?? 0;
@@ -1192,42 +1204,85 @@ async function openPredictionStatsModal() {
 
     const bestPred = pickTeamsByMinAbsDiff(absDiff);
 
+    // ===== NEW: Predicted table (ALL predictions -> pts,gf,ga) =====
+    // Build rows from tAllRaw, supporting both new object shape and old numeric fallback.
+    const tableRows = Object.entries(tAllRaw).map(([team, v]) => {
+      const pts = (typeof v === "number") ? v : Number(v?.pts ?? 0);
+      const gf  = (typeof v === "number") ? 0 : Number(v?.gf  ?? 0);
+      const ga  = (typeof v === "number") ? 0 : Number(v?.ga  ?? 0);
+      return { team, pts, gd: gf - ga, gf };
+    });
+
+    tableRows.sort((a, b) =>
+      b.pts - a.pts ||
+      b.gd  - a.gd  ||
+      b.gf  - a.gf  ||
+      a.team.localeCompare(b.team)
+    );
+
+    const tableHtml = tableRows.length ? `
+      <table class="w-full text-sm mt-2 border border-gray-200 rounded overflow-hidden">
+        <thead>
+          <tr class="bg-gray-50">
+            <th class="w-10 text-right px-2 py-1">#</th>
+            <th class="text-left px-2 py-1">Team</th>
+            <th class="w-14 text-right px-2 py-1">Pts</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows.map((r, i) => `
+            <tr class="${i % 2 ? 'bg-white' : 'bg-gray-50'}">
+              <td class="text-right px-2 py-1">${i + 1}</td>
+              <td class="px-2 py-1 truncate">${r.team}</td>
+              <td class="text-right px-2 py-1">${r.pts}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    ` : `<div class="text-sm text-gray-500 mt-2">No predicted table data.</div>`;
+
+    // ----- Assemble per-player section -----
     html += `
-      <div class="mb-4 border-b pb-3">
+      <div class="mb-6 border-b pb-4">
         <div class="text-base font-semibold mb-2">${player.charAt(0).toUpperCase() + player.slice(1)}</div>
-        <div class="text-sm">
-          <div class="mb-1">
+        <div class="text-sm space-y-1">
+          <div>
             <span class="font-medium">Most liked team:</span>
             ${htmlTeamsList(mostLiked.teams)}
             <span class="text-gray-600">(${mostLiked.value ?? 0} pts)</span>
           </div>
-          <div class="mb-1">
+          <div>
             <span class="font-medium">Most hated team:</span>
             ${htmlTeamsList(mostHated.teams)}
             <span class="text-gray-600">(${mostHated.value ?? 0} pts)</span>
           </div>
-          <div class="mb-1">
+          <div>
             <span class="font-medium">Most overrated team:</span>
             ${htmlTeamsList(mostOver.teams)}
             <span class="text-gray-600">(+${mostOver.value ?? 0})</span>
           </div>
-          <div class="mb-1">
+          <div>
             <span class="font-medium">Most underrated team:</span>
             ${htmlTeamsList(mostUnder.teams)}
             <span class="text-gray-600">(-${mostUnder.value ?? 0})</span>
           </div>
-          <div class="mb-1">
+          <div>
             <span class="font-medium">Best predicted team:</span>
             ${htmlTeamsList(bestPred.teams)}
             <span class="text-gray-600">(±${bestPred.value ?? 0})</span>
           </div>
         </div>
+
+        <!-- Predicted table -->
+        <div class="mt-3">
+          <div class="text-sm font-medium mb-1">Predicted table (all predictions)</div>
+          ${tableHtml}
+        </div>
       </div>
     `;
   }
 
-  document.getElementById("statsModalTitle").textContent =
-    `Predictions stats`;
+  document.getElementById("statsModalTitle").textContent = `Predictions stats`;
   document.getElementById("statsModalContent").innerHTML =
     html || "<div class='text-sm text-gray-600'>No data.</div>";
   document.getElementById("statsModal").classList.remove("hidden");
