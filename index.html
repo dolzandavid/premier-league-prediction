@@ -907,17 +907,32 @@ function tablePoints(outcome, side /* 'home' | 'away' */) {
   if (outcome === "A") return side === "away" ? 3 : 0;
   return 0;
 }
-function vectorForTeam(side, gf, ga) {
-  const out = outcomeFromScore(gf, ga);
+
+// --- TEAM-RELATIVE helpers (for YoY only) ---
+function outcomeForTeam(gf, ga) {
+  // Team-relative outcome: gf/ga are for THIS team
+  if (gf > ga) return "W";
+  if (gf < ga) return "L";
+  return "D";
+}
+
+function teamRelativePoints(out /* 'W'|'D'|'L' */) {
+  return out === "W" ? 3 : out === "D" ? 1 : 0;
+}
+
+// Build a vector from THIS team's perspective (keep signature for compatibility)
+function vectorForTeam(side /* 'home'|'away' */, gf, ga) {
+  const outT = outcomeForTeam(gf, ga); // 'W' | 'D' | 'L' for THIS team
   return {
-    W: out === (side === "home" ? "H" : "A") ? 1 : 0,
-    D: out === "D" ? 1 : 0,
-    L: (out === "H" && side === "away") || (out === "A" && side === "home") ? 1 : 0,
+    W:  outT === "W" ? 1 : 0,
+    D:  outT === "D" ? 1 : 0,
+    L:  outT === "L" ? 1 : 0,
     GF: gf,
     GA: ga,
-    Pts: tablePoints(out, side) // 👈 3/1/0 correctly
+    Pts: teamRelativePoints(outT),
   };
 }
+
 function addVec(dst, v, sign = +1) {
   dst.W += sign*v.W; dst.D += sign*v.D; dst.L += sign*v.L;
   dst.GF += sign*v.GF; dst.GA += sign*v.GA; dst.Pts += sign*v.Pts;
@@ -1818,6 +1833,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
 
     subscribeToGameweek(currentGameweek);
+
 
     document.getElementById("loadingOverlay").classList.add("hidden");
   }
