@@ -901,9 +901,10 @@ function teamStatsAccumulator() {
 
 // Tiny vector algebra for YoY
 function outcomeFromScore(h, a) { return h > a ? "H" : (h < a ? "A" : "D"); }
-function tablePoints(outcome, side) {
+function tablePoints(outcome, side /* 'home' | 'away' */) {
   if (outcome === "D") return 1;
-  if ((outcome === "H" && side === "home") || (outcome === "A" && side === "away")) return 3;
+  if (outcome === "H") return side === "home" ? 3 : 0;
+  if (outcome === "A") return side === "away" ? 3 : 0;
   return 0;
 }
 function vectorForTeam(side, gf, ga) {
@@ -923,8 +924,24 @@ function addVec(dst, v, sign = +1) {
 }
 
 // Use your normalizeTeam mapping if present (so we match history doc ids)
-const _normalizeForHistory = (name) =>
-  (typeof normalizeTeam === "function" ? normalizeTeam(name) : name);
+const HISTORY_NAME_MAP = {
+  "Leeds United": "Leeds",
+  "Manchester United": "Man Utd",
+  "Manchester City": "Man City",
+  "Tottenham Hotspur": "Spurs",
+  "Wolverhampton Wanderers": "Wolves",
+  "West Ham United": "West Ham",
+  "Newcastle United": "Newcastle",
+  "Nottingham Forest": "Nottingham Forest",
+  "Sheffield United": "Sheff Utd",
+  "Brighton & Hove Albion": "Brighton",
+  "AFC Bournemouth": "Bournemouth",
+  // … add others as needed
+};
+
+const _normalizeForHistory = (name) => {
+  return HISTORY_NAME_MAP[name] || name;
+};
 
 // Cache history reads within a single computation
 const _historyDocCache = new Map();
