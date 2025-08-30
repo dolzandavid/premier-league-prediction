@@ -925,18 +925,16 @@ function addVec(dst, v, sign = +1) {
 
 // Use your normalizeTeam mapping if present (so we match history doc ids)
 const HISTORY_NAME_MAP = {
-  "Leeds United": "Leeds",
-  "Manchester United": "Man Utd",
-  "Manchester City": "Man City",
-  "Tottenham Hotspur": "Spurs",
-  "Wolverhampton Wanderers": "Wolves",
-  "West Ham United": "West Ham",
-  "Newcastle United": "Newcastle",
-  "Nottingham Forest": "Nottingham Forest",
-  "Sheffield United": "Sheff Utd",
-  "Brighton & Hove Albion": "Brighton",
-  "AFC Bournemouth": "Bournemouth",
-  // … add others as needed
+  "Leeds": "Leeds United",
+  "Man Utd": "Manchester United",
+  "Man City": "Manchester City",
+  "Spurs": "Tottenham Hotspur",
+  "Wolves": "Wolverhampton Wanderers",
+  "West Ham": "West Ham United",
+  "Newcastle": "Newcastle United",
+ "Nott'm Forest": "Nottingham Forest",
+  "Brighton": "Brighton & Hove Albion",
+  // add others if you find more short forms in fixtures
 };
 
 const _normalizeForHistory = (name) => {
