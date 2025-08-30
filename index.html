@@ -861,9 +861,6 @@ function pointsForOutcome(outcome, asTeam) {
   if (outcome === "A") return asTeam === "away" ? 3 : 0;
   return 1; // draw
 }
-function teamStatsAccumulator() {
-  return { played:0, wins:0, draws:0, losses:0, gf:0, ga:0, gd:0, points:0, forms:[] };
-}
 function normalizeNameLeague(name) {
   // keep exactly your display names; tweak mappings if needed
   return name;
