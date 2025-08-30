@@ -957,7 +957,7 @@ async function getPrevSeasonResult2024_25(home, away) {
 
 // ——— Compute all stats up to currentGameweek ———
 async function computeSeasonStatsUpToCurrentGW() {
-  // Ensure cache has all weeks ≤ currentGW (your original prefill sequence)
+  // Ensure cache has all weeks ≤ currentGW
   const fixtureDocs = await getDocs(collection(db, "fixtures"));
   const allFixtures = fixtureDocs.docs.map(d => ({ id: d.id, ...d.data() }));
   const allWeeks = [...new Set(allFixtures.map(f => String(f.gameweek)))].filter(Boolean);
@@ -981,26 +981,21 @@ async function computeSeasonStatsUpToCurrentGW() {
   }
 
   // ===== REAL table + helper maps =====
-  const teamTable = {};         // team -> aggregates (now includes home/away + yoy)
+  const teamTable = {};         // team -> aggregates (includes home/away + yoy)
   const teamMatchesChrono = {}; // team -> ['W','D','L',...]
-  const teamRealPoints = {};    // team -> real points
+  const teamRealPoints = {};    // team -> real league points tally
 
   // ===== PREDICTED aggregates =====
-  // ALL predictions: { pts,gf,ga,games } per team
-  const playerPredictedTeamPointsAll = {};   // user -> team -> { pts,gf,ga,games }
-  // ONLY fixtures with result: numeric predicted table points per team
-  const playerPredictedTeamPointsScored = {}; // user -> team -> pts
-  // Simple totals (ALL predictions): numeric predicted points per team (for liked/hated)
-  const playerPredictedTeamPoints = {};      // user -> team -> number
-  // Prediction-game points earned per team (ONLY fixtures with result)
-  const playerGamePointsByTeam = {};         // user -> team -> number
+  const playerPredictedTeamPointsAll = {};   // user -> team -> { pts,gf,ga,games } (ALL predictions)
+  const playerPredictedTeamPointsScored = {}; // user -> team -> pts (ONLY fixtures WITH result)
+  const playerPredictedTeamPoints = {};      // user -> team -> number (ALL predictions; for liked/hated)
+  const playerGamePointsByTeam = {};         // user -> team -> number (prediction-game points; ONLY with result)
 
   const sortedWeeks = Object.keys(gameweekCache)
-    .map(String)
-    .filter(w => +w <= +currentGameweek)
+    .map(String).filter(w => +w <= +currentGameweek)
     .sort((a,b)=> +a - +b);
 
-  // Clear history cache for this run
+  // clear per-run cache for history
   _historyDocCache.clear();
 
   for (const w of sortedWeeks) {
@@ -1041,7 +1036,7 @@ async function computeSeasonStatsUpToCurrentGW() {
         th.points += homePts; ta.points += awayPts;
         teamRealPoints[home] += homePts; teamRealPoints[away] += awayPts;
 
-        // NEW: splits
+        // splits
         addToSplit(th.home, res.home, res.away, out, "home");
         addToSplit(ta.away, res.away, res.home, out, "away");
 
@@ -1049,19 +1044,38 @@ async function computeSeasonStatsUpToCurrentGW() {
         teamMatchesChrono[home].push(out === "H" ? "W" : (out === "A" ? "L" : "D"));
         teamMatchesChrono[away].push(out === "A" ? "W" : (out === "H" ? "L" : "D"));
 
-        // NEW: YoY vs 2024/25 (same venue)
+        // ===== YoY vs 2024/25 (same venue) with explicit 3/1/0 delta for Pts =====
+        const curOutcome = outcomeFromScore(res.home, res.away);
+        const curHomePts = tablePoints(curOutcome, "home");
+        const curAwayPts = tablePoints(curOutcome, "away");
+
         const curH = vectorForTeam("home", res.home, res.away);
         const curA = vectorForTeam("away", res.away, res.home);
+
         const prev = await getPrevSeasonResult2024_25(home, away);
         if (prev) {
+          const prevOutcome = outcomeFromScore(prev.gh, prev.ga);
+          const prevHomePts = tablePoints(prevOutcome, "home");
+          const prevAwayPts = tablePoints(prevOutcome, "away");
+
           const prevH = vectorForTeam("home", prev.gh, prev.ga);
           const prevA = vectorForTeam("away", prev.ga, prev.gh);
+
+          // add this season’s full vectors, subtract last season’s
           addVec(th.yoy, curH, +1); addVec(th.yoy, prevH, -1);
           addVec(ta.yoy, curA, +1); addVec(ta.yoy, prevA, -1);
+
+          // explicit league points delta (3/1/0 swings)
+          th.yoy.Pts += (curHomePts - prevHomePts);
+          ta.yoy.Pts += (curAwayPts - prevAwayPts);
         } else {
+          // last season missing: add only current vectors + current table points
           addVec(th.yoy, curH, +1);
           addVec(ta.yoy, curA, +1);
-          th.yoy.missingPrev++; ta.yoy.missingPrev++;
+          th.yoy.Pts += curHomePts;
+          ta.yoy.Pts += curAwayPts;
+          th.yoy.missingPrev++;
+          ta.yoy.missingPrev++;
         }
       }
 
@@ -1109,7 +1123,7 @@ async function computeSeasonStatsUpToCurrentGW() {
     }
   }
 
-  // ===== Build league table positions from results (your sort, with extra fields) =====
+  // ===== Build league table positions from results =====
   const teams = Object.keys(teamTable);
   const tableArr = teams.map(team => ({
     team, ...teamTable[team],
@@ -1132,9 +1146,9 @@ async function computeSeasonStatsUpToCurrentGW() {
       position: positionByTeam[team] || null,
       played: t.played, wins: t.wins, draws: t.draws, losses: t.losses,
       gf: t.gf, ga: t.ga, gd: t.gf - t.ga, points: t.points,
-      home: t.home,  // { played,wins,draws,losses,gf,ga,points }
-      away: t.away,  // { ... }
-      yoy: t.yoy,    // { W,D,L,GF,GA,Pts,missingPrev }
+      home: t.home,
+      away: t.away,
+      yoy: t.yoy, // { W,D,L,GF,GA, Pts (as 3/1/0 delta), missingPrev }
     };
   }
 
@@ -1144,10 +1158,10 @@ async function computeSeasonStatsUpToCurrentGW() {
     teamRealPoints,
 
     // Per-player outputs
-    playerPredictedTeamPoints,         // { user: { team: number } } (ALL predictions; liked/hated)
-    playerPredictedTeamPointsAll,      // { user: { team: { pts,gf,ga,games } } }
-    playerPredictedTeamPointsScored,   // { user: { team: number } } (ONLY fixtures WITH results)
-    playerGamePointsByTeam,            // { user: { team: number } } (prediction-game points earned; only with results)
+    playerPredictedTeamPoints,         // ALL predictions; liked/hated
+    playerPredictedTeamPointsAll,      // ALL predictions with {pts,gf,ga,games}
+    playerPredictedTeamPointsScored,   // ONLY fixtures WITH result (predicted table points)
+    playerGamePointsByTeam,            // ONLY fixtures WITH result (prediction-game points)
   };
 }
 
