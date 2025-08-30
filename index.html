@@ -901,16 +901,21 @@ function teamStatsAccumulator() {
 
 // Tiny vector algebra for YoY
 function outcomeFromScore(h, a) { return h > a ? "H" : (h < a ? "A" : "D"); }
-function tablePoints(outcome, side /* 'home' | 'away' */) {
+function tablePoints(outcome, side) {
   if (outcome === "D") return 1;
-  if (outcome === "H") return side === "home" ? 3 : 0;
-  if (outcome === "A") return side === "away" ? 3 : 0;
+  if ((outcome === "H" && side === "home") || (outcome === "A" && side === "away")) return 3;
   return 0;
 }
 function vectorForTeam(side, gf, ga) {
-  const o = outcomeFromScore(gf, ga);
-  return { W:(o==="H")?1:0, D:(o==="D")?1:0, L:(o==="A")?1:0,
-           GF:gf, GA:ga, Pts: tablePoints(o, side) };
+  const out = outcomeFromScore(gf, ga);
+  return {
+    W: out === (side === "home" ? "H" : "A") ? 1 : 0,
+    D: out === "D" ? 1 : 0,
+    L: (out === "H" && side === "away") || (out === "A" && side === "home") ? 1 : 0,
+    GF: gf,
+    GA: ga,
+    Pts: tablePoints(out, side) // 👈 3/1/0 correctly
+  };
 }
 function addVec(dst, v, sign = +1) {
   dst.W += sign*v.W; dst.D += sign*v.D; dst.L += sign*v.L;
