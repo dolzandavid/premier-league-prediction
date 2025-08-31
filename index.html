@@ -1116,12 +1116,32 @@ async function computeSeasonStatsUpToCurrentGW() {
         (playerGamePointsByTeam[user] ||= {});
 
         // ALL predictions → { pts,gf,ga,games } per team
-        const aggH = (playerPredictedTeamPointsAll[user][home] ||= { pts: 0, gf: 0, ga: 0, games: 0 });
-        const aggA = (playerPredictedTeamPointsAll[user][away] ||= { pts: 0, gf: 0, ga: 0, games: 0 });
-        aggH.pts += homePredPts;   aggA.pts += awayPredPts;
-        aggH.gf  += p.home;        aggA.gf  += p.away;
-        aggH.ga  += p.away;        aggA.ga  += p.home;
-        aggH.games++;              aggA.games++;
+// ALL predictions → { pts,gf,ga,games,wins,draws,losses } per team
+const aggH = (playerPredictedTeamPointsAll[user][home] ||= { pts: 0, gf: 0, ga: 0, games: 0, wins: 0, draws: 0, losses: 0 });
+const aggA = (playerPredictedTeamPointsAll[user][away] ||= { pts: 0, gf: 0, ga: 0, games: 0, wins: 0, draws: 0, losses: 0 });
+
+aggH.pts += homePredPts;
+aggA.pts += awayPredPts;
+
+aggH.gf += p.home;
+aggH.ga += p.away;
+aggH.games++;
+
+aggA.gf += p.away;
+aggA.ga += p.home;
+aggA.games++;
+
+// Count W/D/L for predicted outcome
+if (predictedOutcome === "H") {
+  aggH.wins++;
+  aggA.losses++;
+} else if (predictedOutcome === "A") {
+  aggA.wins++;
+  aggH.losses++;
+} else {
+  aggH.draws++;
+  aggA.draws++;
+}
 
         // Simple totals for liked/hated
         playerPredictedTeamPoints[user][home] = (playerPredictedTeamPoints[user][home] || 0) + homePredPts;
@@ -1338,7 +1358,7 @@ async function openPredictionStatsModal() {
         Object.entries(stats.teams || {}).map(([team, t]) => [team, t.points ?? 0])
       );
 
-  const perPlayerAll    = stats.playerPredictedTeamPointsAll    || {}; // player -> team -> {pts,gf,ga,p}
+  const perPlayerAll    = stats.playerPredictedTeamPointsAll    || {}; // player -> team -> {pts,gf,ga,games,wins,draws,losses}
   const perPlayerScored = stats.playerPredictedTeamPointsScored || {}; // player -> team -> pts
 
   const realTeamsArray = Object.keys(teamRealPoints);
@@ -1402,9 +1422,12 @@ async function openPredictionStatsModal() {
       const pts = Number(v?.pts ?? 0);
       const gf  = Number(v?.gf  ?? 0);
       const ga  = Number(v?.ga  ?? 0);
-     const p = Number(v?.games ?? 0);
+      const p   = Number(v?.games ?? 0);
+      const w   = Number(v?.wins ?? 0);
+      const d   = Number(v?.draws ?? 0);
+      const l   = Number(v?.losses ?? 0);
       const gd  = gf - ga;
-      return { team, pts, p, gf, ga, gd };
+      return { team, pts, p, w, d, l, gf, ga, gd };
     }).sort((a, b) =>
       b.pts - a.pts ||
       b.gd  - a.gd  ||
@@ -1419,10 +1442,13 @@ async function openPredictionStatsModal() {
             <th class="w-10 text-right px-2 py-1">#</th>
             <th class="text-left px-2 py-1">Team</th>
             <th class="w-8 text-right px-2 py-1">P</th>
-            <th class="w-12 text-right px-2 py-1">Pts</th>
-            <th class="w-12 text-right px-2 py-1">GF</th>
-            <th class="w-12 text-right px-2 py-1">GA</th>
-            <th class="w-12 text-right px-2 py-1">GD</th>
+            <th class="w-8 text-right px-2 py-1">W</th>
+            <th class="w-8 text-right px-2 py-1">D</th>
+            <th class="w-8 text-right px-2 py-1">L</th>
+            <th class="w-10 text-right px-2 py-1">GF</th>
+            <th class="w-10 text-right px-2 py-1">GA</th>
+            <th class="w-10 text-right px-2 py-1">GD</th>
+            <th class="w-10 text-right px-2 py-1">Pts</th>
           </tr>
         </thead>
         <tbody>
@@ -1431,10 +1457,13 @@ async function openPredictionStatsModal() {
               <td class="text-right px-2 py-1">${i + 1}</td>
               <td class="px-2 py-1 truncate">${r.team}</td>
               <td class="text-right px-2 py-1">${r.p}</td>
-              <td class="text-right px-2 py-1">${r.pts}</td>
+              <td class="text-right px-2 py-1">${r.w}</td>
+              <td class="text-right px-2 py-1">${r.d}</td>
+              <td class="text-right px-2 py-1">${r.l}</td>
               <td class="text-right px-2 py-1">${r.gf}</td>
               <td class="text-right px-2 py-1">${r.ga}</td>
               <td class="text-right px-2 py-1">${r.gd}</td>
+              <td class="text-right px-2 py-1">${r.pts}</td>
             </tr>
           `).join("")}
         </tbody>
@@ -1465,10 +1494,8 @@ async function openPredictionStatsModal() {
     ${playerStatsHtml}
   `;
 
-  // Show modal
   document.getElementById("statsModal").classList.remove("hidden");
 
-  // Activate first player by default
   const buttons = document.querySelectorAll(".playerBtn");
   const sections = document.querySelectorAll(".playerStats");
   buttons.forEach(btn => btn.classList.add("bg-white", "text-gray-700", "border-gray-300"));
@@ -1479,7 +1506,6 @@ async function openPredictionStatsModal() {
     document.querySelector(`.playerStats[data-player="${buttons[0].dataset.player}"]`).classList.remove("hidden");
   }
 
-  // Click handler
   buttons.forEach(btn => {
     btn.onclick = () => {
       const selected = btn.dataset.player;
