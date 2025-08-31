@@ -1251,15 +1251,18 @@ async function openLeagueTableModal() {
         GA = t.ga ?? 0;
         Pts = t.points ?? 0;
       } else if (mode === "lastyear") {
-        const last = lastYear[team] || {};
-        const yoy = teams[team]?.yoy || {};
-        P   = (last.P ?? 0) + (yoy.missingPrev ?? 0);
-        W   = (last.W ?? 0) + (yoy.W ?? 0);
-        D   = (last.D ?? 0) + (yoy.D ?? 0);
-        L   = (last.L ?? 0) + (yoy.L ?? 0);
-        GF  = (last.GF ?? 0) + (yoy.GF ?? 0);
-        GA  = (last.GA ?? 0) + (yoy.GA ?? 0);
-        Pts = (last.Pts ?? 0) + (yoy.Pts ?? 0);
+  const last = lastYear?.[team] || {};
+  const yoy = teams?.[team]?.yoy || {};
+
+  const toNum = (x) => Number.isFinite(x) ? x : 0;
+
+  P   = toNum(last.P)   + toNum(yoy.missingPrev);
+  W   = toNum(last.W)   + toNum(yoy.W);
+  D   = toNum(last.D)   + toNum(yoy.D);
+  L   = toNum(last.L)   + toNum(yoy.L);
+  GF  = toNum(last.GF)  + toNum(yoy.GF);
+  GA  = toNum(last.GA)  + toNum(yoy.GA);
+  Pts = toNum(last.Pts) + toNum(yoy.Pts);
       } else {
         const t = teams[team] || {};
         P = t.played ?? t.games ?? 0;
