@@ -1209,63 +1209,142 @@ if (predictedOutcome === "H") {
 async function openLeagueTableModal() {
   const stats = await getSeasonStats();
   const teams = stats.teams || {};
-  const gw = stats.currentGameweek ?? currentGameweek;
+  const teamNames = Object.keys(teams || {});
+  const lastYearSnap = await getDoc(doc(db, "stats", "lastyear"));
+  const lastYear = lastYearSnap.exists() ? lastYearSnap.data() : {};
+  const modes = ["overall", "home", "away", "lastyear"];
 
-  // Build array and sort by position ASC
-  const rows = Object.entries(teams).map(([team, t]) => ({
-    team,
-    pos: t.position ?? 9999,
-    W: t.wins ?? 0,
-    D: t.draws ?? 0,
-    L: t.losses ?? 0,
-    Pts: t.points ?? 0,
-    GF: t.gf ?? 0,
-    GA: t.ga ?? 0,
-    GD: (t.gd ?? ((t.gf ?? 0) - (t.ga ?? 0)))
-  })).sort((a,b)=> a.pos - b.pos || a.team.localeCompare(b.team));
+  const modeLabels = {
+    overall: "Overall",
+    home: "Home",
+    away: "Away",
+    lastyear: "Last Season (adjusted)",
+  };
 
-  const thead = `
+  const buttonsHtml = modes.map(mode => `
+    <button class="leagueModeBtn px-3 py-1 rounded border text-sm mr-2 mb-2"
+            data-mode="${mode}">
+      ${modeLabels[mode]}
+    </button>
+  `).join("");
+
+  const buildRows = (mode) => {
+    return teamNames.map(team => {
+      let P = 0, W = 0, D = 0, L = 0, GF = 0, GA = 0, Pts = 0;
+
+      if (mode === "home") {
+        const t = teams[team]?.home || {};
+        P = t.played ?? t.games ?? 0;
+        W = t.wins ?? 0;
+        D = t.draws ?? 0;
+        L = t.losses ?? 0;
+        GF = t.gf ?? 0;
+        GA = t.ga ?? 0;
+        Pts = t.points ?? 0;
+      } else if (mode === "away") {
+        const t = teams[team]?.away || {};
+        P = t.played ?? t.games ?? 0;
+        W = t.wins ?? 0;
+        D = t.draws ?? 0;
+        L = t.losses ?? 0;
+        GF = t.gf ?? 0;
+        GA = t.ga ?? 0;
+        Pts = t.points ?? 0;
+      } else if (mode === "lastyear") {
+        const last = lastYear[team] || {};
+        const yoy = teams[team]?.yoy || {};
+        P   = (last.P ?? 0) + (yoy.missingPrev ?? 0);
+        W   = (last.W ?? 0) + (yoy.W ?? 0);
+        D   = (last.D ?? 0) + (yoy.D ?? 0);
+        L   = (last.L ?? 0) + (yoy.L ?? 0);
+        GF  = (last.GF ?? 0) + (yoy.GF ?? 0);
+        GA  = (last.GA ?? 0) + (yoy.GA ?? 0);
+        Pts = (last.Pts ?? 0) + (yoy.Pts ?? 0);
+      } else {
+        const t = teams[team] || {};
+        P = t.played ?? t.games ?? 0;
+        W = t.wins ?? 0;
+        D = t.draws ?? 0;
+        L = t.losses ?? 0;
+        GF = t.gf ?? 0;
+        GA = t.ga ?? 0;
+        Pts = t.points ?? 0;
+      }
+
+      const GD = GF - GA;
+
+      return { team, P, W, D, L, GF, GA, GD, Pts };
+    }).sort((a, b) =>
+      b.Pts - a.Pts || b.GD - a.GD || b.GF - a.GF || a.team.localeCompare(b.team)
+    ).map((r, i) => `
+      <tr class="hover:bg-gray-50">
+        <td class="px-2 py-1"><span class="text-red-600 font-bold">${i + 1}.</span></td>
+        <td class="px-2 py-1">${r.team}</td>
+        <td class="px-2 py-1 text-right">${r.P}</td>
+        <td class="px-2 py-1 text-right">${r.W}</td>
+        <td class="px-2 py-1 text-right">${r.D}</td>
+        <td class="px-2 py-1 text-right">${r.L}</td>
+        <td class="px-2 py-1 text-right">${r.GF}</td>
+        <td class="px-2 py-1 text-right">${r.GA}</td>
+        <td class="px-2 py-1 text-right">${r.GD}</td>
+        <td class="px-2 py-1 text-right font-semibold">${r.Pts}</td>
+      </tr>
+    `).join("");
+  };
+
+  const tableHeader = `
     <thead class="bg-gray-100">
       <tr>
         <th class="px-2 py-1 text-left">Pos</th>
         <th class="px-2 py-1 text-left">Team</th>
+        <th class="px-2 py-1 text-right">P</th>
         <th class="px-2 py-1 text-right">W</th>
         <th class="px-2 py-1 text-right">D</th>
         <th class="px-2 py-1 text-right">L</th>
-        <th class="px-2 py-1 text-right">Pts</th>
         <th class="px-2 py-1 text-right">GF</th>
         <th class="px-2 py-1 text-right">GA</th>
         <th class="px-2 py-1 text-right">GD</th>
+        <th class="px-2 py-1 text-right">Pts</th>
       </tr>
-    </thead>`;
-
-  const tbody = rows.map(r => `
-    <tr class="hover:bg-gray-50">
-      <td class="px-2 py-1"><span class="text-red-600 font-bold">${r.pos}.</span></td>
-      <td class="px-2 py-1">${r.team}</td>
-      <td class="px-2 py-1 text-right">${r.W}</td>
-      <td class="px-2 py-1 text-right">${r.D}</td>
-      <td class="px-2 py-1 text-right">${r.L}</td>
-      <td class="px-2 py-1 text-right font-semibold">${r.Pts}</td>
-      <td class="px-2 py-1 text-right">${r.GF}</td>
-      <td class="px-2 py-1 text-right">${r.GA}</td>
-      <td class="px-2 py-1 text-right">${r.GD}</td>
-    </tr>
-  `).join("");
-
-  document.getElementById("statsModalTitle").textContent =
-    `League Table`;
-
-  document.getElementById("statsModalContent").innerHTML = `
-    <div class="overflow-x-auto">
-      <table class="table-auto w-full border text-sm">
-        ${thead}
-        <tbody>${tbody}</tbody>
-      </table>
-    </div>
+    </thead>
   `;
 
+  const allTablesHtml = modes.map(mode => `
+    <div class="leagueTable hidden" data-mode="${mode}">
+      <table class="table-auto w-full border text-sm">
+        ${tableHeader}
+        <tbody>${buildRows(mode)}</tbody>
+      </table>
+    </div>
+  `).join("");
+
+  document.getElementById("statsModalTitle").textContent = `League Table`;
+  document.getElementById("statsModalContent").innerHTML = `
+    <div class="mb-4 flex flex-wrap">${buttonsHtml}</div>
+    <div class="overflow-x-auto">${allTablesHtml}</div>
+  `;
   document.getElementById("statsModal").classList.remove("hidden");
+
+  const btns = document.querySelectorAll(".leagueModeBtn");
+  const tables = document.querySelectorAll(".leagueTable");
+  const activateMode = (mode) => {
+    btns.forEach(b => {
+      const active = b.dataset.mode === mode;
+      b.classList.toggle("bg-blue-600", active);
+      b.classList.toggle("text-white", active);
+      b.classList.toggle("bg-white", !active);
+      b.classList.toggle("text-gray-700", !active);
+    });
+    tables.forEach(t => {
+      t.classList.toggle("hidden", t.dataset.mode !== mode);
+    });
+  };
+
+  btns.forEach(btn => {
+    btn.onclick = () => activateMode(btn.dataset.mode);
+  });
+
+  activateMode("overall"); // default
 }
 
 async function openFormGuideModal() {
