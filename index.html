@@ -1402,7 +1402,7 @@ async function openPredictionStatsModal() {
       const pts = Number(v?.pts ?? 0);
       const gf  = Number(v?.gf  ?? 0);
       const ga  = Number(v?.ga  ?? 0);
-      const p   = Number(v?.p   ?? 0);
+     const p = Number(v?.games ?? 0);
       const gd  = gf - ga;
       return { team, pts, p, gf, ga, gd };
     }).sort((a, b) =>
