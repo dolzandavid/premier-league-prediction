@@ -1210,8 +1210,8 @@ async function openLeagueTableModal() {
   const stats = await getSeasonStats();
   const teams = stats.teams || {};
   const teamNames = Object.keys(teams || {});
-  const lastYearSnap = await getDoc(doc(db, "stats", "lastyear"));
-  const lastYear = lastYearSnap.exists() ? lastYearSnap.data() : {};
+const lastYearSnap = await getDocs(collection(db, "lastyear"));
+const lastYear = Object.fromEntries(lastYearSnap.docs.map(d => [d.id, d.data()]));
   const modes = ["overall", "home", "away", "lastyear"];
 
   const modeLabels = {
