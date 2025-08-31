@@ -1402,21 +1402,23 @@ async function openPredictionStatsModal() {
     })();
     const bestPred = pickTeamsByMinAbsDiff(absDiff);
 
-    const mostPointsTeam = (() => {
-      const arr = Object.entries(tScored);
-      if (!arr.length) return { teams: [], value: 0 };
-      const max = Math.max(...arr.map(([_, v]) => v));
-      const teams = arr.filter(([_, v]) => v === max).map(([team]) => team);
-      return { teams, value: max };
-    })();
+const gamePts = stats.playerGamePointsByTeam?.[player] || {};
 
-    const leastPointsTeam = (() => {
-      const arr = Object.entries(tScored);
-      if (!arr.length) return { teams: [], value: 0 };
-      const min = Math.min(...arr.map(([_, v]) => v));
-      const teams = arr.filter(([_, v]) => v === min).map(([team]) => team);
-      return { teams, value: min };
-    })();
+const mostPointsTeam = (() => {
+  const arr = Object.entries(gamePts);
+  if (!arr.length) return { teams: [], value: 0 };
+  const max = Math.max(...arr.map(([_, v]) => v));
+  const teams = arr.filter(([_, v]) => v === max).map(([team]) => team);
+  return { teams, value: max };
+})();
+
+const leastPointsTeam = (() => {
+  const arr = Object.entries(gamePts);
+  if (!arr.length) return { teams: [], value: 0 };
+  const min = Math.min(...arr.map(([_, v]) => v));
+  const teams = arr.filter(([_, v]) => v === min).map(([team]) => team);
+  return { teams, value: min };
+})();
 
     const tAllArray = Object.entries(tAllRaw).map(([team, v]) => {
       const pts = Number(v?.pts ?? 0);
