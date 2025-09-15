@@ -1521,31 +1521,29 @@ const leastPointsTeam = (() => {
       <table class="w-full text-sm mt-2 border border-gray-200 rounded overflow-hidden">
         <thead>
           <tr class="bg-gray-50">
-            <th class="w-10 text-right px-2 py-1">#</th>
-            <th class="text-left px-2 py-1">Team</th>
-            <th class="w-8 text-right px-2 py-1">P</th>
-            <th class="w-8 text-right px-2 py-1">W</th>
-            <th class="w-8 text-right px-2 py-1">D</th>
-            <th class="w-8 text-right px-2 py-1">L</th>
-            <th class="w-10 text-right px-2 py-1">GF</th>
-            <th class="w-10 text-right px-2 py-1">GA</th>
-            <th class="w-10 text-right px-2 py-1">GD</th>
-            <th class="w-10 text-right px-2 py-1">Pts</th>
+            <th class="w-10 text-right px-1 py-1">#</th>
+            <th class="text-left px-1 py-1">Team</th>
+            <th class="w-8 text-right px-1 py-1">P</th>
+            <th class="w-8 text-right px-1 py-1">W</th>
+            <th class="w-8 text-right px-1 py-1">D</th>
+            <th class="w-8 text-right px-1 py-1">L</th>
+            <th class="w-10 text-right px-1 py-1">+/-</th>
+            <th class="w-10 text-right px-1 py-1">GD</th>
+            <th class="w-10 text-right px-1 py-1">Pts</th>
           </tr>
         </thead>
         <tbody>
           ${tAllArray.map((r, i) => `
             <tr class="${i % 2 ? 'bg-white' : 'bg-gray-50'}">
-              <td class="text-right px-2 py-1">${i + 1}</td>
-              <td class="px-2 py-1 truncate">${r.team}</td>
-              <td class="text-right px-2 py-1">${r.p}</td>
-              <td class="text-right px-2 py-1">${r.w}</td>
-              <td class="text-right px-2 py-1">${r.d}</td>
-              <td class="text-right px-2 py-1">${r.l}</td>
-              <td class="text-right px-2 py-1">${r.gf}</td>
-              <td class="text-right px-2 py-1">${r.ga}</td>
-              <td class="text-right px-2 py-1">${r.gd}</td>
-              <td class="text-right px-2 py-1">${r.pts}</td>
+              <td class="text-right px-1 py-1">${i + 1}</td>
+              <td class="px-1 py-1 truncate">${r.team}</td>
+              <td class="text-right px-1 py-1">${r.p}</td>
+              <td class="text-right px-1 py-1">${r.w}</td>
+              <td class="text-right px-1 py-1">${r.d}</td>
+              <td class="text-right px-1 py-1">${r.l}</td>
+              <td class="text-right px-1 py-1">${r.gf}-${r.ga}</td>
+              <td class="text-right px-1 py-1">${r.gd}</td>
+              <td class="text-right px-1 py-1">${r.pts}</td>
             </tr>
           `).join("")}
         </tbody>
