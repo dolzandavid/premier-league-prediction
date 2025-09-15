@@ -1244,9 +1244,9 @@ const lastYear = Object.fromEntries(lastYearSnap.docs.map(d => [d.id, d.data()])
       } else if (mode === "away") {
         const t = teams[team]?.away || {};
         P = t.played ?? t.games ?? 0;
-        W = t.wins ?? 0;
+        W = t.losses ?? 0;
         D = t.draws ?? 0;
-        L = t.losses ?? 0;
+        L = t.wins ?? 0;
         GF = t.gf ?? 0;
         GA = t.ga ?? 0;
         Pts = t.points ?? 0;
