@@ -1951,11 +1951,8 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   if (savedUser && users[savedUser]) {
     currentUser = savedUser;
-if (savedGameweek) {
-  currentGameweek = savedGameweek;
-} else {
-  await determineClosestGameweek();
-}
+await determineClosestGameweek();
+localStorage.setItem("selectedGameweek", currentGameweek);
 
     loginSection.style.display = "none";
     appDiv.style.display = "block";
