@@ -1951,11 +1951,20 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   if (savedUser && users[savedUser]) {
     currentUser = savedUser;
-    currentGameweek = savedGameweek || "1";
+if (savedGameweek) {
+  currentGameweek = savedGameweek;
+} else {
+  await determineClosestGameweek();
+}
 
     loginSection.style.display = "none";
     appDiv.style.display = "block";
     welcomeUser.textContent = `Welcome, ${savedUser.charAt(0).toUpperCase() + savedUser.slice(1)}`;
+document.getElementById("statsButtons").style.display = "flex";
+["btnLeagueTable","btnFormGuide","btnPredStats"].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.disabled = false;
+});
 
     if (savedUser === "david") {
       document.getElementById("fixtureEditor").classList.remove("hidden");
