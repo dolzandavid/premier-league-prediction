@@ -1279,38 +1279,38 @@ const lastYear = Object.fromEntries(lastYearSnap.docs.map(d => [d.id, d.data()])
       return { team, P, W, D, L, GF, GA, GD, Pts };
     }).sort((a, b) =>
       b.Pts - a.Pts || b.GD - a.GD || b.GF - a.GF || a.team.localeCompare(b.team)
-    ).map((r, i) => `
-      <tr class="hover:bg-gray-50">
-        <td class="px-2 py-1"><span class="text-red-600 font-bold">${i + 1}.</span></td>
-        <td class="px-2 py-1">${r.team}</td>
-        <td class="px-2 py-1 text-right">${r.P}</td>
-        <td class="px-2 py-1 text-right">${r.W}</td>
-        <td class="px-2 py-1 text-right">${r.D}</td>
-        <td class="px-2 py-1 text-right">${r.L}</td>
-        <td class="px-2 py-1 text-right">${r.GF}</td>
-        <td class="px-2 py-1 text-right">${r.GA}</td>
-        <td class="px-2 py-1 text-right">${r.GD}</td>
-        <td class="px-2 py-1 text-right font-semibold">${r.Pts}</td>
-      </tr>
-    `).join("");
+.map((r, i) => `
+  <tr class="text-sm border-b hover:bg-gray-50">
+    <td class="px-1 py-1">${i + 1}</td>
+    <td class="px-1 py-1">${r.team}</td>
+    <td class="px-1 py-1 text-right">${r.P}</td>
+    <td class="px-1 py-1 text-right">${r.W}</td>
+    <td class="px-1 py-1 text-right">${r.D}</td>
+    <td class="px-1 py-1 text-right">${r.L}</td>
+    <td class="px-1 py-1 text-right">${r.GF}-${r.GA}</td>
+  <td class="px-1 py-1 text-right">${r.GD}</td>
+    <td class="px-1 py-1 text-right font-semibold">${r.Pts}</td>
+  </tr>
+`).join("")
   };
 
-  const tableHeader = `
-    <thead class="bg-gray-100">
-      <tr>
-        <th class="px-2 py-1 text-left">Pos</th>
-        <th class="px-2 py-1 text-left">Team</th>
-        <th class="px-2 py-1 text-right">P</th>
-        <th class="px-2 py-1 text-right">W</th>
-        <th class="px-2 py-1 text-right">D</th>
-        <th class="px-2 py-1 text-right">L</th>
-        <th class="px-2 py-1 text-right">GF</th>
-        <th class="px-2 py-1 text-right">GA</th>
-        <th class="px-2 py-1 text-right">GD</th>
-        <th class="px-2 py-1 text-right">Pts</th>
-      </tr>
-    </thead>
-  `;
+
+const tableHeader = `
+  <thead class="bg-gray-100 text-xs">
+    <tr>
+      <th class="px-1 py-1 text-left">#</th>
+      <th class="px-1 py-1 text-left">Team</th>
+      <th class="px-1 py-1 text-right">P</th>
+      <th class="px-1 py-1 text-right">W</th>
+      <th class="px-1 py-1 text-right">D</th>
+      <th class="px-1 py-1 text-right">L</th>
+      <th class="px-1 py-1 text-right">+/-</th>
+      <th class="px-1 py-1 text-right">GD</th>
+      <th class="px-1 py-1 text-right">Pts</th>
+    </tr>
+  </thead>
+`;
+
 
   const allTablesHtml = modes.map(mode => `
     <div class="leagueTable hidden" data-mode="${mode}">
